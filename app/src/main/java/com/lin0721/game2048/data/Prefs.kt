@@ -1,6 +1,7 @@
 package com.lin0721.game2048.data
 
 import android.content.Context
+import com.lin0721.game2048.core.MineDifficulty
 
 /**
  * 本地持久化：设置、最高分与未结束的牌局。
@@ -36,12 +37,33 @@ class Prefs(context: Context) {
             sp.edit().putInt(KEY_BEST_SCORE, value).apply()
         }
 
-    /** 扫雷的最短通关用时（秒），0 表示还没通关过。 */
-    var bestMinesweeperSeconds: Int
-        get() = sp.getInt(KEY_BEST_MINESWEEPER, 0)
+    /** 当前扫雷难度，切换后开新局。 */
+    var mineDifficulty: MineDifficulty
+        get() = MineDifficulty.of(sp.getString(KEY_MINE_DIFFICULTY, null))
         set(value) {
-            sp.edit().putInt(KEY_BEST_MINESWEEPER, value).apply()
+            sp.edit().putString(KEY_MINE_DIFFICULTY, value.name).apply()
         }
+
+    /** 指定难度的最短通关用时（秒），0 表示还没通关。 */
+    fun bestMinesweeperSeconds(difficulty: MineDifficulty): Int {
+        val saved = sp.getInt(bestKey(difficulty), 0)
+        // 0.3.0 只有一个总纪录，迁移成简单难度
+        return if (saved == 0 && difficulty == MineDifficulty.EASY) {
+            sp.getInt(KEY_BEST_MINESWEEPER_LEGACY, 0)
+        } else {
+            saved
+        }
+    }
+
+    fun setBestMinesweeperSeconds(difficulty: MineDifficulty, seconds: Int) {
+        sp.edit().putInt(bestKey(difficulty), seconds).apply()
+    }
+
+    private fun bestKey(difficulty: MineDifficulty): String = when (difficulty) {
+        MineDifficulty.EASY -> KEY_BEST_MINESWEEPER_EASY
+        MineDifficulty.MEDIUM -> KEY_BEST_MINESWEEPER_MEDIUM
+        MineDifficulty.HARD -> KEY_BEST_MINESWEEPER_HARD
+    }
 
     /** 跳一跳的最高分。 */
     var bestJump: Int
@@ -81,7 +103,11 @@ class Prefs(context: Context) {
         private const val KEY_BEST_SCORE = "best_score"
         private const val KEY_SAVED_GAME = "saved_game"
         private const val KEY_SAVED_SCORE = "saved_score"
-        private const val KEY_BEST_MINESWEEPER = "best_minesweeper_seconds"
+        private const val KEY_MINE_DIFFICULTY = "mine_difficulty"
+        private const val KEY_BEST_MINESWEEPER_LEGACY = "best_minesweeper_seconds"
+        private const val KEY_BEST_MINESWEEPER_EASY = "best_minesweeper_easy_seconds"
+        private const val KEY_BEST_MINESWEEPER_MEDIUM = "best_minesweeper_medium_seconds"
+        private const val KEY_BEST_MINESWEEPER_HARD = "best_minesweeper_hard_seconds"
         private const val KEY_BEST_JUMP = "best_jump"
     }
 }

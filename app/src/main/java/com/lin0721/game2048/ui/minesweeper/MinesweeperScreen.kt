@@ -3,9 +3,11 @@ package com.lin0721.game2048.ui.minesweeper
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,11 +18,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,33 +42,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.game2048.core.MineCell
+import com.lin0721.game2048.core.MineDifficulty
 import com.lin0721.game2048.core.Minesweeper
 import com.lin0721.game2048.core.MinesweeperState
 import com.lin0721.game2048.core.MinesweeperStatus
 import com.lin0721.game2048.data.Prefs
 import kotlinx.coroutines.delay
 
-/** 扫雷页：9×9 小屏棋盘、长按/插旗模式、计时与胜负弹窗。 */
+/** 扫雷页：三档难度、长按/插旗模式、计时、难度确认与胜负弹窗。 */
 @Composable
 fun MinesweeperScreen(prefs: Prefs, onBack: () -> Unit) {
-    var game by remember { mutableStateOf(Minesweeper.newGame()) }
+    var difficulty by remember { mutableStateOf(prefs.mineDifficulty) }
+    var game by remember { mutableStateOf(Minesweeper.newGame(difficulty)) }
     var flagMode by remember { mutableStateOf(false) }
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showResult by remember { mutableStateOf(false) }
     var newRecord by remember { mutableStateOf(false) }
+    var pendingDifficulty by remember { mutableStateOf<MineDifficulty?>(null) }
 
     BackHandler(onBack = onBack)
-
-    // 第一次挖开后才开始走秒；胜负已分后停在 finishedAt
-    LaunchedEffect(game.status, game.startedAt) {
-        while (game.status == MinesweeperStatus.PLAYING && game.startedAt != null) {
-            now = System.currentTimeMillis()
-            delay(250)
-        }
-    }
 
     LaunchedEffect(game.status) {
         when (game.status) {
@@ -73,9 +72,9 @@ fun MinesweeperScreen(prefs: Prefs, onBack: () -> Unit) {
                 val seconds = game
                     .elapsedSeconds(game.finishedAt ?: System.currentTimeMillis())
                     .coerceAtLeast(1)
-                val old = prefs.bestMinesweeperSeconds
+                val old = prefs.bestMinesweeperSeconds(difficulty)
                 if (old == 0 || seconds < old) {
-                    prefs.bestMinesweeperSeconds = seconds
+                    prefs.setBestMinesweeperSeconds(difficulty, seconds)
                     newRecord = true
                 }
                 showResult = true
@@ -85,12 +84,14 @@ fun MinesweeperScreen(prefs: Prefs, onBack: () -> Unit) {
         }
     }
 
-    fun restart() {
-        game = Minesweeper.newGame()
+    /** 切难度/重开都走这里，清掉上一局的所有临时状态。 */
+    fun startNew(target: MineDifficulty) {
+        difficulty = target
+        prefs.mineDifficulty = target
+        game = Minesweeper.newGame(target)
         flagMode = false
         showResult = false
         newRecord = false
-        now = System.currentTimeMillis()
     }
 
     fun tap(index: Int) {
@@ -109,18 +110,15 @@ fun MinesweeperScreen(prefs: Prefs, onBack: () -> Unit) {
         game = Minesweeper.toggleFlag(game, index / game.size, index % game.size)
     }
 
-    val seconds = game.elapsedSeconds(now)
-    val best = prefs.bestMinesweeperSeconds
+    val best = prefs.bestMinesweeperSeconds(difficulty)
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             Modifier.fillMaxSize().safeDrawingPadding()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 4.dp),
         ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回首页",
@@ -130,52 +128,85 @@ fun MinesweeperScreen(prefs: Prefs, onBack: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text(
                         "扫雷", color = MaterialTheme.colorScheme.onSurface,
-                        fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp, fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        if (best > 0) "9×9 · 10 雷 · 最快 ${formatTime(best)}" else "9×9 · 10 雷",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp,
+                        buildString {
+                            append("${difficulty.size}×${difficulty.size} · ${difficulty.mines} 雷")
+                            if (best > 0) append(" · 最快 ${formatTime(best)}")
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp,
                     )
                 }
-                Text(
-                    formatTime(seconds), color = MaterialTheme.colorScheme.primary,
-                    fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                )
+                TimerText(game)
             }
 
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                MineDifficulty.entries.forEach { level ->
+                    SelectChip(
+                        text = difficultyName(level),
+                        selected = level == difficulty,
+                        onClick = {
+                            if (level != difficulty) pendingDifficulty = level
+                        },
+                    )
+                    Spacer(Modifier.padding(horizontal = 2.dp))
+                }
+                Spacer(Modifier.weight(1f))
                 Text(
                     "⚑ ${game.remainingMines}",
-                    color = MaterialTheme.colorScheme.onSurface, fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                 )
-                FilterChip(
+                Spacer(Modifier.padding(horizontal = 3.dp))
+                SelectChip(
+                    text = if (flagMode) "插旗中" else "插旗",
                     selected = flagMode,
                     onClick = { flagMode = !flagMode },
-                    label = { Text(if (flagMode) "插旗中" else "挖开") },
                 )
             }
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
 
-            Box(
-                Modifier.weight(1f).fillMaxWidth(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(Modifier.fillMaxSize().aspectRatio(1f, matchHeightConstraintsFirst = true)) {
-                    MineBoard(game, onTap = { tap(it) }, onLongPress = { longPress(it) })
-                }
-            }
+            MineBoard(
+                game = game,
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                onTap = { tap(it) },
+                onLongPress = { longPress(it) },
+            )
         }
+    }
+
+    pendingDifficulty?.let { target ->
+        AlertDialog(
+            onDismissRequest = { pendingDifficulty = null },
+            title = {
+                Text(
+                    "切换难度", color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                )
+            },
+            text = {
+                Text(
+                    "将开始一局新的「${difficultyName(target)}」扫雷，当前进度会丢失。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    startNew(target)
+                    pendingDifficulty = null
+                }) { Text("开新局") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDifficulty = null }) { Text("取消") }
+            },
+        )
     }
 
     if (showResult && game.status != MinesweeperStatus.PLAYING) {
         val won = game.status == MinesweeperStatus.WON
-        val used = game.elapsedSeconds(game.finishedAt ?: now).coerceAtLeast(1)
+        val used = game.elapsedSeconds(game.finishedAt ?: System.currentTimeMillis()).coerceAtLeast(1)
         AlertDialog(
             onDismissRequest = {},
             title = {
@@ -187,7 +218,8 @@ fun MinesweeperScreen(prefs: Prefs, onBack: () -> Unit) {
             text = {
                 Text(
                     if (won) {
-                        "用时 ${formatTime(used)}" + if (newRecord) "，新纪录！" else ""
+                        "「${difficultyName(difficulty)}」用时 ${formatTime(used)}" +
+                            if (newRecord) "，新纪录！" else ""
                     } else {
                         "这局有 ${game.mineCount} 颗雷，再来一次？"
                     },
@@ -195,7 +227,7 @@ fun MinesweeperScreen(prefs: Prefs, onBack: () -> Unit) {
                 )
             },
             confirmButton = {
-                TextButton(onClick = { restart() }) { Text("再来一局") }
+                TextButton(onClick = { startNew(difficulty) }) { Text("再来一局") }
             },
             dismissButton = {
                 TextButton(onClick = {
@@ -207,32 +239,86 @@ fun MinesweeperScreen(prefs: Prefs, onBack: () -> Unit) {
     }
 }
 
+/** 计时单独成节点，秒数跳动时不会带着整个棋盘重组。 */
+@Composable
+private fun TimerText(game: MinesweeperState) {
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(game.status, game.startedAt) {
+        while (game.status == MinesweeperStatus.PLAYING && game.startedAt != null) {
+            now = System.currentTimeMillis()
+            delay(250)
+        }
+    }
+    Text(
+        formatTime(game.elapsedSeconds(game.finishedAt ?: now)),
+        color = MaterialTheme.colorScheme.primary,
+        fontSize = 18.sp, fontWeight = FontWeight.Bold,
+    )
+}
+
+@Composable
+private fun SelectChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier.height(28.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 9.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 11.sp, fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
 @Composable
 private fun MineBoard(
     game: MinesweeperState,
+    modifier: Modifier,
     onTap: (Int) -> Unit,
     onLongPress: (Int) -> Unit,
 ) {
-    Column(
-        Modifier.fillMaxSize()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(4.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        for (row in 0 until game.size) {
-            Row(
-                Modifier.weight(1f).fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                for (col in 0 until game.size) {
-                    val index = row * game.size + col
-                    MineCellView(
-                        cell = game.cells[index],
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                        onClick = { onTap(index) },
-                        onLongClick = { onLongPress(index) },
-                    )
+    BoxWithConstraints(modifier) {
+        val gap = if (game.size >= 14) 1.dp else 2.dp
+        val inner = 4.dp
+        val cell = (maxWidth - gap * (game.size - 1).toFloat() - inner * 2) / game.size.toFloat()
+        val numberSize = (cell.value * 0.56f).coerceIn(8f, 18f).sp
+        val symbolSize = (cell.value * 0.68f).coerceIn(9f, 22f).sp
+        val corner = (cell.value * 0.16f).coerceIn(2f, 5f).dp
+
+        Column(
+            Modifier.fillMaxSize()
+                .clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(inner),
+            verticalArrangement = Arrangement.spacedBy(gap),
+        ) {
+            for (row in 0 until game.size) {
+                Row(
+                    Modifier.weight(1f).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                ) {
+                    for (col in 0 until game.size) {
+                        val index = row * game.size + col
+                        MineCellView(
+                            cell = game.cells[index],
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            numberSize = numberSize,
+                            symbolSize = symbolSize,
+                            corner = corner,
+                            onClick = { onTap(index) },
+                            onLongClick = { onLongPress(index) },
+                        )
+                    }
                 }
             }
         }
@@ -244,13 +330,16 @@ private fun MineBoard(
 private fun MineCellView(
     cell: MineCell,
     modifier: Modifier,
+    numberSize: TextUnit,
+    symbolSize: TextUnit,
+    corner: Dp,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
     val background = if (cell.revealed) Color(0xFF1E1A20) else Color(0xFF353039)
     Box(
         modifier
-            .clip(RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(corner))
             .background(background)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         contentAlignment = Alignment.Center,
@@ -258,19 +347,25 @@ private fun MineCellView(
         when {
             cell.revealed && cell.mine -> Text(
                 "✹", color = Color(0xFFEF9A9A),
-                fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                fontSize = symbolSize, fontWeight = FontWeight.Bold,
             )
             cell.revealed && cell.adjacent > 0 -> Text(
                 "${cell.adjacent}", color = numberColor(cell.adjacent),
-                fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                fontSize = numberSize, fontWeight = FontWeight.Bold,
             )
             !cell.revealed && cell.flagged -> Text(
                 "⚑", color = MaterialTheme.colorScheme.primary,
-                fontSize = 13.sp,
+                fontSize = symbolSize,
             )
             else -> Unit
         }
     }
+}
+
+private fun difficultyName(difficulty: MineDifficulty): String = when (difficulty) {
+    MineDifficulty.EASY -> "简单"
+    MineDifficulty.MEDIUM -> "中等"
+    MineDifficulty.HARD -> "困难"
 }
 
 private fun numberColor(value: Int): Color = when (value) {

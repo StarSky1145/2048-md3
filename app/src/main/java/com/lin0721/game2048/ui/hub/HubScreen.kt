@@ -26,8 +26,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lin0721.game2048.core.MineDifficulty
 import com.lin0721.game2048.data.Prefs
 
 /**
@@ -72,12 +74,10 @@ fun HubScreen(
 
             GameCard(
                 name = "扫雷",
-                subtitle = "9×9 · 10 颗雷，首点必安全",
-                best = if (prefs.bestMinesweeperSeconds > 0) {
-                    "最快 ${formatDuration(prefs.bestMinesweeperSeconds)}"
-                } else {
-                    "尚未通关"
-                },
+                subtitle = "三档难度，首点必安全",
+                best = "简单 ${mineBest(prefs, MineDifficulty.EASY)} · " +
+                    "中等 ${mineBest(prefs, MineDifficulty.MEDIUM)} · " +
+                    "困难 ${mineBest(prefs, MineDifficulty.HARD)}",
                 badge = "雷",
                 badgeColor = Color(0xFF3E5C76),
                 onClick = onOpenMinesweeper,
@@ -95,6 +95,11 @@ fun HubScreen(
             )
         }
     }
+}
+
+private fun mineBest(prefs: Prefs, difficulty: MineDifficulty): String {
+    val seconds = prefs.bestMinesweeperSeconds(difficulty)
+    return if (seconds > 0) formatDuration(seconds) else "--"
 }
 
 private fun formatDuration(seconds: Int): String {
@@ -138,15 +143,17 @@ private fun GameCard(
             )
             Text(
                 subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp,
+                fontSize = 11.sp,
             )
-        }
-        Column(horizontalAlignment = Alignment.End) {
             Text(
                 best, color = MaterialTheme.colorScheme.primary,
-                fontSize = 11.sp, fontWeight = FontWeight.Medium,
+                fontSize = 10.sp, fontWeight = FontWeight.Medium,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
-            Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 22.sp)
         }
+        Text(
+            "›", color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 22.sp, modifier = Modifier.padding(start = 6.dp),
+        )
     }
 }

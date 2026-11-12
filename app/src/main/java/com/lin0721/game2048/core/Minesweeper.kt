@@ -12,6 +12,19 @@ data class MineCell(
 
 enum class MinesweeperStatus { PLAYING, WON, LOST }
 
+/** 三档难度；size 为边长，mines 为雷数。 */
+enum class MineDifficulty(val size: Int, val mines: Int) {
+    EASY(9, 10),
+    MEDIUM(12, 25),
+    HARD(16, 50);
+
+    companion object {
+        /** 从持久化的名字恢复，旧数据/坏数据回退到简单。 */
+        fun of(value: String?): MineDifficulty =
+            entries.firstOrNull { it.name == value } ?: EASY
+    }
+}
+
 /** 一局扫雷的完整状态；所有操作都返回新状态，UI 只负责渲染。 */
 data class MinesweeperState(
     val size: Int = Minesweeper.DEFAULT_SIZE,
@@ -36,7 +49,7 @@ data class MinesweeperState(
 }
 
 /**
- * 9×9 / 10 雷的扫雷逻辑，纯 Kotlin，不依赖 Compose。
+ * 扫雷逻辑，纯 Kotlin，不依赖 Compose；支持 9×9 / 12×12 / 16×16 三档。
  *
  * 第一次挖开时才放雷：被点的格子和它周围 8 格一定没有雷，
  * 所以第一下必然安全，而且会挖开一小片；插旗不会触发放雷。
@@ -45,6 +58,9 @@ object Minesweeper {
 
     const val DEFAULT_SIZE = 9
     const val DEFAULT_MINES = 10
+
+    fun newGame(difficulty: MineDifficulty): MinesweeperState =
+        newGame(difficulty.size, difficulty.mines)
 
     fun newGame(
         size: Int = DEFAULT_SIZE,
