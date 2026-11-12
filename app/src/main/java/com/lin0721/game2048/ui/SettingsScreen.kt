@@ -97,7 +97,7 @@ fun SettingsScreen(
                 onClick = onNewGame,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
             ) { Text("新游戏") }
-            Hint("会清空当前得分与进度", Modifier.padding(horizontal = 20.dp, top = 2.dp))
+            Hint("会清空当前得分与进度", Modifier.padding(start = 20.dp, end = 20.dp, top = 2.dp))
 
             HorizontalDivider(
                 Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
