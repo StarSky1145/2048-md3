@@ -49,6 +49,7 @@ import com.lin0721.game2048.core.Jump
 import com.lin0721.game2048.core.JumpResult
 import com.lin0721.game2048.core.JumpStatus
 import com.lin0721.game2048.data.Prefs
+import com.lin0721.game2048.ui.LocalUiMetrics
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -92,6 +93,7 @@ fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
     val rebound = remember { Animatable(1f) }
     val camera = remember { Animatable(game.platforms[0].center) }
     val stage = remember { IsoStage() }
+    val ui = LocalUiMetrics.current
 
     BackHandler(onBack = onBack)
 
@@ -233,7 +235,8 @@ fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
 
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    Modifier.fillMaxWidth()
+                        .padding(horizontal = ui.space(8.dp), vertical = ui.space(4.dp)),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onBack) {
@@ -245,7 +248,7 @@ fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
                     Column(Modifier.weight(1f)) {
                         Text(
                             "跳一跳", color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                            fontSize = ui.title(22.sp), fontWeight = FontWeight.Bold,
                         )
                         Text(
                             "按住蓄力，松手起跳", color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -303,8 +306,12 @@ fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
 /** 蓄力指示：单独重组，避免按住时整页跟着重组。 */
 @Composable
 private fun ChargeBar(charging: Boolean, power: () -> Float) {
+    val ui = LocalUiMetrics.current
     val p = if (charging) power().coerceIn(0f, 1f) else 0f
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
+    Column(
+        Modifier.fillMaxWidth()
+            .padding(horizontal = ui.space(20.dp), vertical = ui.space(12.dp)),
+    ) {
         Text(
             if (charging) "蓄力 ${(p * 100).roundToInt()}%" else "按住蓄力，松手起跳",
             color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp,

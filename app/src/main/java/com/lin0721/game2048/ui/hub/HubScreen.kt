@@ -16,6 +16,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.game2048.core.MineDifficulty
 import com.lin0721.game2048.data.Prefs
+import com.lin0721.game2048.ui.LocalUiMetrics
 import com.lin0721.game2048.ui.ScreenScaffold
 
 /**
@@ -42,23 +47,35 @@ fun HubScreen(
     onOpen2048: () -> Unit,
     onOpenMinesweeper: () -> Unit,
     onOpenJump: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     ScreenScaffold {
+        val ui = LocalUiMetrics.current
         Column(
             Modifier.fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = ui.space(16.dp), vertical = ui.space(12.dp)),
         ) {
-            Text(
-                "小游戏", color = MaterialTheme.colorScheme.onBackground,
-                fontSize = 28.sp, fontWeight = FontWeight.Bold,
-            )
-            Text(
-                "挑一个开始，随时回来", color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp,
-            )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "小游戏", color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = ui.title(28.sp), fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        "挑一个开始，随时回来", color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                    )
+                }
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        Icons.Filled.Settings, contentDescription = "设置",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(ui.space(16.dp)))
 
             GameCard(
                 name = "2048",
@@ -69,7 +86,7 @@ fun HubScreen(
                 onClick = onOpen2048,
             )
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(ui.space(10.dp)))
 
             GameCard(
                 name = "扫雷",
@@ -82,7 +99,7 @@ fun HubScreen(
                 onClick = onOpenMinesweeper,
             )
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(ui.space(10.dp)))
 
             GameCard(
                 name = "跳一跳",
@@ -121,7 +138,7 @@ private fun GameCard(
         Modifier.fillMaxWidth().clip(shape)
             .background(MaterialTheme.colorScheme.surface)
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = LocalUiMetrics.current.space(14.dp), vertical = LocalUiMetrics.current.space(12.dp)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(

@@ -41,7 +41,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.game2048.data.Prefs
+import com.lin0721.game2048.data.LayoutMode
+import com.lin0721.game2048.ui.LocalUiMetrics
 import com.lin0721.game2048.ui.ScreenScaffold
+import com.lin0721.game2048.ui.settings.SettingsScreen
 import com.lin0721.game2048.core.Dir
 import com.lin0721.game2048.core.Expectimax
 import com.lin0721.game2048.core.MoveResult
@@ -57,7 +60,12 @@ import kotlinx.coroutines.withContext
  * 启动时从 [prefs] 读回最高分和未结束的牌局，每步再写回去。
  */
 @Composable
-fun GameScreen(prefs: Prefs, onBack: () -> Unit) {
+fun GameScreen(
+    prefs: Prefs,
+    layout: LayoutMode,
+    onLayoutChange: (LayoutMode) -> Unit,
+    onBack: () -> Unit,
+) {
     // 只恢复"还能继续走"的牌局；已结束的存档直接开新局
     val saved = remember { prefs.savedGame?.let { TileBoard.decode(it) }?.takeIf { it.canMove() } }
     val savedScore = if (saved != null) prefs.savedScore else 0
@@ -73,6 +81,7 @@ fun GameScreen(prefs: Prefs, onBack: () -> Unit) {
     var animate by remember { mutableStateOf(prefs.animate) }
     var animationMs by remember { mutableIntStateOf(prefs.animationMs) }
     var stepMs by remember { mutableIntStateOf(prefs.stepMs) }
+    val ui = LocalUiMetrics.current
 
     // 设置页自己处理返回键；这里只在牌局界面把返回交给上层
     BackHandler(enabled = !settingsOpen, onBack = onBack)
@@ -116,6 +125,15 @@ fun GameScreen(prefs: Prefs, onBack: () -> Unit) {
         }
     }
 
+    // 设置页直接写 Prefs，回到牌局时同步一次本地状态
+    LaunchedEffect(settingsOpen) {
+        if (!settingsOpen) {
+            animate = prefs.animate
+            animationMs = prefs.animationMs
+            stepMs = prefs.stepMs
+        }
+    }
+
     // 首次进入时如果没有可恢复的牌局，把新棋盘也存下来，
     // 这样去首页再回来不会换一副牌
     LaunchedEffect(Unit) {
@@ -135,23 +153,11 @@ fun GameScreen(prefs: Prefs, onBack: () -> Unit) {
 
     if (settingsOpen) {
         SettingsScreen(
+            prefs = prefs,
+            layout = layout,
+            onLayoutChange = onLayoutChange,
             auto = auto,
             onAutoChange = { auto = it },
-            animate = animate,
-            onAnimateChange = {
-                animate = it
-                prefs.animate = it
-            },
-            animationMs = animationMs,
-            onAnimationMsChange = {
-                animationMs = it
-                prefs.animationMs = it
-            },
-            stepMs = stepMs,
-            onStepMsChange = {
-                stepMs = it
-                prefs.stepMs = it
-            },
             onNewGame = {
                 startNewGame()
                 settingsOpen = false
@@ -164,7 +170,8 @@ fun GameScreen(prefs: Prefs, onBack: () -> Unit) {
     ScreenScaffold {
         // 头两行固定高度，棋盘在剩下的安全区里取 min(宽, 高) 居中，小屏也不会被圆角切掉
         Column(
-            Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 6.dp),
+            Modifier.fillMaxSize()
+                .padding(horizontal = ui.space(8.dp), vertical = ui.space(6.dp)),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -177,7 +184,7 @@ fun GameScreen(prefs: Prefs, onBack: () -> Unit) {
                 }
                 Text(
                     "2048", color = MaterialTheme.colorScheme.onBackground,
-                    fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                    fontSize = ui.title(22.sp), fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.weight(1f))
                 CompactScore("得分", score)
@@ -316,7 +323,7 @@ private fun CompactButton(
     onClick: () -> Unit,
 ) {
     Box(
-        modifier.height(34.dp).clip(RoundedCornerShape(10.dp))
+        modifier.height(LocalUiMetrics.current.buttonHeight(34.dp)).clip(RoundedCornerShape(10.dp))
             .background(container).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {

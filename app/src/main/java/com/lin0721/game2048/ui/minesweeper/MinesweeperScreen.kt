@@ -48,6 +48,7 @@ import com.lin0721.game2048.core.Minesweeper
 import com.lin0721.game2048.core.MinesweeperState
 import com.lin0721.game2048.core.MinesweeperStatus
 import com.lin0721.game2048.data.Prefs
+import com.lin0721.game2048.ui.LocalUiMetrics
 import com.lin0721.game2048.ui.ScreenScaffold
 import kotlinx.coroutines.delay
 
@@ -108,10 +109,12 @@ fun MinesweeperScreen(prefs: Prefs, onBack: () -> Unit) {
     }
 
     val best = prefs.bestMinesweeperSeconds(difficulty)
+    val ui = LocalUiMetrics.current
 
     ScreenScaffold {
         Column(
-            Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 4.dp),
+            Modifier.fillMaxSize()
+                .padding(horizontal = ui.space(12.dp), vertical = ui.space(4.dp)),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
@@ -123,7 +126,7 @@ fun MinesweeperScreen(prefs: Prefs, onBack: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text(
                         "扫雷", color = MaterialTheme.colorScheme.onSurface,
-                        fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                        fontSize = ui.title(20.sp), fontWeight = FontWeight.Bold,
                     )
                     Text(
                         buildString {

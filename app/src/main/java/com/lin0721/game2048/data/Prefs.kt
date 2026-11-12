@@ -37,6 +37,13 @@ class Prefs(context: Context) {
             sp.edit().putInt(KEY_BEST_SCORE, value).apply()
         }
 
+    /** 界面布局：标准 / 紧凑，改完所有页面立刻生效。 */
+    var layoutMode: LayoutMode
+        get() = LayoutMode.of(sp.getString(KEY_LAYOUT_MODE, null))
+        set(value) {
+            sp.edit().putString(KEY_LAYOUT_MODE, value.name).apply()
+        }
+
     /** 当前扫雷难度，切换后开新局。 */
     var mineDifficulty: MineDifficulty
         get() = MineDifficulty.of(sp.getString(KEY_MINE_DIFFICULTY, null))
@@ -103,6 +110,7 @@ class Prefs(context: Context) {
         private const val KEY_BEST_SCORE = "best_score"
         private const val KEY_SAVED_GAME = "saved_game"
         private const val KEY_SAVED_SCORE = "saved_score"
+        private const val KEY_LAYOUT_MODE = "layout_mode"
         private const val KEY_MINE_DIFFICULTY = "mine_difficulty"
         private const val KEY_BEST_MINESWEEPER_LEGACY = "best_minesweeper_seconds"
         private const val KEY_BEST_MINESWEEPER_EASY = "best_minesweeper_easy_seconds"
