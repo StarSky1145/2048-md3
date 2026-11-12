@@ -1,5 +1,9 @@
 package com.lin0721.game2048.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -84,7 +88,21 @@ fun GameScreen() {
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = { board = Board.newGame(); score = 0; over = false; auto = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                ) { Text("新游戏") }
+                OutlinedButton(
+                    onClick = { auto = !auto },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = if (auto) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    ),
+                ) { Text(if (auto) "停止自动" else "自动游玩") }
+            }
+
+            Spacer(Modifier.height(10.dp))
 
             Box(
                 Modifier.fillMaxWidth().aspectRatio(1f)
@@ -127,19 +145,6 @@ fun GameScreen() {
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = { board = Board.newGame(); score = 0; over = false; auto = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                ) { Text("新游戏") }
-                OutlinedButton(
-                    onClick = { auto = !auto },
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = if (auto) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                    ),
-                ) { Text(if (auto) "停止自动" else "自动游玩") }
-            }
             Spacer(Modifier.height(10.dp))
             Text(
                 if (auto) "AI 正在走：expectimax 3 层" else "滑动方块，或点自动游玩看 AI 下",
@@ -163,7 +168,14 @@ private fun ScoreCard(label: String, value: Int) {
 @Composable
 private fun Tile(value: Int, modifier: Modifier = Modifier) {
     val (bg, fg) = tileColors(value)
-    Box(modifier.clip(RoundedCornerShape(10.dp)).background(bg), contentAlignment = Alignment.Center) {
+    val scale = remember { Animatable(1f) }
+    LaunchedEffect(value) {
+        if (value != 0) {
+            scale.snapTo(1.12f)
+            scale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
+        }
+    }
+    Box(modifier.scale(scale.value).clip(RoundedCornerShape(10.dp)).background(bg), contentAlignment = Alignment.Center) {
         if (value != 0) {
             Text(
                 value.toString(), color = fg,
