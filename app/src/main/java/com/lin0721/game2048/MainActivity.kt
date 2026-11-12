@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.lin0721.game2048.data.Prefs
-import com.lin0721.game2048.ui.Game2048Theme
+import com.lin0721.game2048.ui.MiniGamesTheme
 import com.lin0721.game2048.ui.GameApp
 
 class MainActivity : ComponentActivity() {
@@ -13,6 +13,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val prefs = Prefs(applicationContext)
-        setContent { Game2048Theme { GameApp(prefs) } }
+        setContent { MiniGamesTheme { GameApp(prefs) } }
     }
 }

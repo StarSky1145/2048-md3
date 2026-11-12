@@ -45,7 +45,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-latest
-          name: 2048
+          name: 小游戏
           body: "commit ${{ github.sha }}"
           files: |
             app/build/outputs/apk/debug/*.apk
