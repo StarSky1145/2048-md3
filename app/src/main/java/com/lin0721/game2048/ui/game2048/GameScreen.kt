@@ -2,6 +2,7 @@ package com.lin0721.game2048.ui.game2048
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,16 +15,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,8 +39,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.game2048.data.Prefs
@@ -163,60 +165,62 @@ fun GameScreen(prefs: Prefs, onBack: () -> Unit) {
     }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        // 小屏优先保证棋盘宽度：整页可滚动，棋盘内部自己消费拖拽
         Column(
-            Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp),
+            Modifier.fillMaxSize().safeDrawingPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) {
+                TopIconButton(onClick = onBack, description = "返回首页") {
                     Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回首页",
+                        Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "2048", color = MaterialTheme.colorScheme.onBackground,
-                        fontSize = 24.sp, fontWeight = FontWeight.Bold,
+                Text(
+                    "2048", color = MaterialTheme.colorScheme.onBackground,
+                    fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.weight(1f))
+                CompactScore("得分", score)
+                Spacer(Modifier.width(6.dp))
+                CompactScore("最高", best)
+                Spacer(Modifier.width(2.dp))
+                TopIconButton(onClick = { settingsOpen = true }, description = "设置") {
+                    Icon(
+                        Icons.Filled.Settings, contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
                     )
-                    Text(
-                        "合并方块，凑出 2048", color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp,
-                    )
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ScoreCard("得分", score)
-                    ScoreCard("最高", best)
-                    IconButton(onClick = { settingsOpen = true }) {
-                        Icon(
-                            Icons.Filled.Settings, contentDescription = "设置",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
+            Spacer(Modifier.height(4.dp))
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CompactButton(
+                    text = "新游戏",
+                    container = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.weight(1f),
                     onClick = { startNewGame() },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                ) { Text("新游戏") }
-                OutlinedButton(
+                )
+                CompactButton(
+                    text = if (auto) "停止自动" else "自动游玩",
+                    container = if (auto) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                    contentColor = if (auto) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
                     onClick = { auto = !auto },
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = if (auto) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                    ),
-                ) { Text(if (auto) "停止自动" else "自动游玩") }
+                )
             }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(4.dp))
 
             Box(
-                Modifier.weight(1f).aspectRatio(1f, matchHeightConstraintsFirst = true)
+                Modifier.fillMaxWidth().aspectRatio(1f)
                     .pointerInput(over) {
                         var dx = 0f
                         var dy = 0f
@@ -229,7 +233,11 @@ fun GameScreen(prefs: Prefs, onBack: () -> Unit) {
                                     if (dy > 40f) play(Dir.DOWN) else if (dy < -40f) play(Dir.UP)
                                 }
                             },
-                        ) { _, drag -> dx += drag.x; dy += drag.y }
+                        ) { change, drag ->
+                            change.consume()
+                            dx += drag.x
+                            dy += drag.y
+                        }
                     },
             ) {
                 BoardView(
@@ -253,24 +261,58 @@ fun GameScreen(prefs: Prefs, onBack: () -> Unit) {
                     }
                 }
             }
-
-            Spacer(Modifier.height(10.dp))
-            Text(
-                if (auto) "AI 正在走：expectimax 4 层" else "滑动方块，或点自动游玩看 AI 下",
-                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, textAlign = TextAlign.Center,
-            )
         }
     }
 }
 
+/** 顶栏图标：自己做 36dp，避免 Material 默认 48dp 把标题行撑高。 */
 @Composable
-private fun ScoreCard(label: String, value: Int) {
-    Column(
-        Modifier.clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+private fun TopIconButton(
+    onClick: () -> Unit,
+    description: String,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        Modifier.size(36.dp).clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .semantics { this.contentDescription = description },
+        contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
-        Text(value.toString(), color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        content()
+    }
+}
+
+/** 得分/最高压成一行小胶囊，给棋盘让出高度。 */
+@Composable
+private fun CompactScore(label: String, value: Int) {
+    Row(
+        Modifier.clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp)
+        Spacer(Modifier.width(4.dp))
+        Text(
+            value.toString(), color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 13.sp, fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+/** 34dp 紧凑按钮，保证 368 宽下按钮行不会把棋盘挤小。 */
+@Composable
+private fun CompactButton(
+    text: String,
+    container: Color,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier.height(34.dp).clip(RoundedCornerShape(10.dp))
+            .background(container).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = contentColor, fontSize = 13.sp, fontWeight = FontWeight.Medium)
     }
 }

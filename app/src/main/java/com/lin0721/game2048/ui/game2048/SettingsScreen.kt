@@ -101,6 +101,10 @@ fun SettingsScreen(
                 onAnimationMsChange = onAnimationMsChange,
             )
             StepRow(stepMs, onStepMsChange)
+            Hint(
+                "滑动方块，或点自动游玩看 AI 下；自动游玩用 expectimax 4 层，每步最多 60ms",
+                Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp),
+            )
 
             HorizontalDivider(
                 Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
