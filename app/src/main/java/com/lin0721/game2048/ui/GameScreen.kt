@@ -132,7 +132,7 @@ fun GameScreen() {
                 Column(Modifier.weight(1f)) {
                     Text(
                         "2048", color = MaterialTheme.colorScheme.onBackground,
-                        fontSize = 28.sp, fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp, fontWeight = FontWeight.Bold,
                     )
                     Text(
                         "合并方块，凑出 2048", color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -171,7 +171,7 @@ fun GameScreen() {
             Spacer(Modifier.height(10.dp))
 
             Box(
-                Modifier.fillMaxWidth().aspectRatio(1f)
+                Modifier.weight(1f).aspectRatio(1f, matchHeightConstraintsFirst = true)
                     .pointerInput(over) {
                         var dx = 0f
                         var dy = 0f
