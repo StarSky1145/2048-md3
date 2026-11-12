@@ -1,4 +1,4 @@
-package com.lin0721.game2048.ui
+package com.lin0721.game2048.ui.game2048
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable

@@ -1,5 +1,6 @@
-package com.lin0721.game2048.ui
+package com.lin0721.game2048.ui.game2048
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -41,10 +43,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.game2048.data.Prefs
-import com.lin0721.game2048.game.Dir
-import com.lin0721.game2048.game.Expectimax
-import com.lin0721.game2048.game.MoveResult
-import com.lin0721.game2048.game.TileBoard
+import com.lin0721.game2048.core.Dir
+import com.lin0721.game2048.core.Expectimax
+import com.lin0721.game2048.core.MoveResult
+import com.lin0721.game2048.core.TileBoard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -56,7 +58,7 @@ import kotlinx.coroutines.withContext
  * 启动时从 [prefs] 读回最高分和未结束的牌局，每步再写回去。
  */
 @Composable
-fun GameScreen(prefs: Prefs) {
+fun GameScreen(prefs: Prefs, onBack: () -> Unit) {
     // 只恢复"还能继续走"的牌局；已结束的存档直接开新局
     val saved = remember { prefs.savedGame?.let { TileBoard.decode(it) }?.takeIf { it.canMove() } }
     val savedScore = if (saved != null) prefs.savedScore else 0
@@ -72,6 +74,9 @@ fun GameScreen(prefs: Prefs) {
     var animate by remember { mutableStateOf(prefs.animate) }
     var animationMs by remember { mutableIntStateOf(prefs.animationMs) }
     var stepMs by remember { mutableIntStateOf(prefs.stepMs) }
+
+    // 设置页自己处理返回键；这里只在牌局界面把返回交给上层
+    BackHandler(enabled = !settingsOpen, onBack = onBack)
 
     fun saveGame(b: TileBoard, s: Int) {
         prefs.savedGame = b.encode()
@@ -110,6 +115,12 @@ fun GameScreen(prefs: Prefs) {
         } else {
             saveGame(next, score)
         }
+    }
+
+    // 首次进入时如果没有可恢复的牌局，把新棋盘也存下来，
+    // 这样去首页再回来不会换一副牌
+    LaunchedEffect(Unit) {
+        if (saved == null) saveGame(board, score)
     }
 
     // 自动游玩：按设置里的间隔循环，搜索放到后台线程，避免拖慢滑动动画
@@ -157,6 +168,12 @@ fun GameScreen(prefs: Prefs) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回首页",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Column(Modifier.weight(1f)) {
                     Text(
                         "2048", color = MaterialTheme.colorScheme.onBackground,

@@ -1,4 +1,4 @@
-package com.lin0721.game2048.ui
+package com.lin0721.game2048.ui.game2048
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -35,9 +35,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lin0721.game2048.game.MoveResult
-import com.lin0721.game2048.game.Slide
-import com.lin0721.game2048.game.TileBoard
+import com.lin0721.game2048.core.MoveResult
+import com.lin0721.game2048.core.Slide
+import com.lin0721.game2048.core.TileBoard
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

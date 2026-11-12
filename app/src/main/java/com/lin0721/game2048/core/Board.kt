@@ -1,4 +1,4 @@
-package com.lin0721.game2048.game
+package com.lin0721.game2048.core
 
 import kotlin.random.Random
 

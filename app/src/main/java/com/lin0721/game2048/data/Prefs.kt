@@ -36,7 +36,7 @@ class Prefs(context: Context) {
             sp.edit().putInt(KEY_BEST_SCORE, value).apply()
         }
 
-    /** 当前牌局的棋盘编码，格式见 [com.lin0721.game2048.game.TileBoard.encode]。 */
+    /** 当前牌局的棋盘编码，格式见 [com.lin0721.game2048.core.TileBoard.encode]。 */
     var savedGame: String?
         get() = sp.getString(KEY_SAVED_GAME, null)
         set(value) {

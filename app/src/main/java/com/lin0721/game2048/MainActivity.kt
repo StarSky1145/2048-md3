@@ -6,13 +6,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.lin0721.game2048.data.Prefs
 import com.lin0721.game2048.ui.Game2048Theme
-import com.lin0721.game2048.ui.GameScreen
+import com.lin0721.game2048.ui.GameApp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val prefs = Prefs(applicationContext)
-        setContent { Game2048Theme { GameScreen(prefs) } }
+        setContent { Game2048Theme { GameApp(prefs) } }
     }
 }
