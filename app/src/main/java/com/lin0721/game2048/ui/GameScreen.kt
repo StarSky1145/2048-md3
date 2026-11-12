@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lin0721.game2048.data.Prefs
 import com.lin0721.game2048.game.Dir
 import com.lin0721.game2048.game.Expectimax
 import com.lin0721.game2048.game.MoveResult
@@ -48,34 +49,44 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-/** 自动游玩的默认步进间隔（毫秒），与设置页的 150ms 档一致。 */
-private const val DEFAULT_STEP_MS = 150
-
 /**
  * 一局 2048 的全部界面状态：棋盘、分数、自动游玩、动画开关与设置页导航。
  *
- * 棋盘状态放在这里而不是设置页里，所以打开设置再返回时牌局不会丢。
+ * 棋盘状态放在这里而不是设置页里，所以打开设置再返回时牌局不会丢；
+ * 启动时从 [prefs] 读回最高分和未结束的牌局，每步再写回去。
  */
 @Composable
-fun GameScreen() {
-    var board by remember { mutableStateOf(TileBoard.newGame()) }
+fun GameScreen(prefs: Prefs) {
+    // 只恢复"还能继续走"的牌局；已结束的存档直接开新局
+    val saved = remember { prefs.savedGame?.let { TileBoard.decode(it) }?.takeIf { it.canMove() } }
+    val savedScore = if (saved != null) prefs.savedScore else 0
+
+    var board by remember { mutableStateOf(saved ?: TileBoard.newGame()) }
     var lastMove by remember { mutableStateOf<MoveResult?>(null) }
     var moveSeq by remember { mutableIntStateOf(0) }
-    var score by remember { mutableIntStateOf(0) }
-    var best by remember { mutableIntStateOf(0) }
+    var score by remember { mutableIntStateOf(savedScore) }
+    var best by remember { mutableIntStateOf(maxOf(prefs.bestScore, savedScore)) }
     var auto by remember { mutableStateOf(false) }
     var over by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
-    var animate by remember { mutableStateOf(true) }
-    var stepMs by remember { mutableIntStateOf(DEFAULT_STEP_MS) }
+    var animate by remember { mutableStateOf(prefs.animate) }
+    var animationMs by remember { mutableIntStateOf(prefs.animationMs) }
+    var stepMs by remember { mutableIntStateOf(prefs.stepMs) }
+
+    fun saveGame(b: TileBoard, s: Int) {
+        prefs.savedGame = b.encode()
+        prefs.savedScore = s
+    }
 
     fun startNewGame() {
-        board = TileBoard.newGame()
+        val fresh = TileBoard.newGame()
+        board = fresh
         lastMove = null
         moveSeq++
         score = 0
         over = false
         auto = false
+        saveGame(fresh, 0)
     }
 
     /** 走一步：先按规则移动，再补一个新方块，最后把整段变化交给 UI 做动画。 */
@@ -88,10 +99,16 @@ fun GameScreen() {
         lastMove = result.copy(tiles = next.tiles, spawned = spawned)
         moveSeq++
         score += result.gained
-        if (score > best) best = score
+        if (score > best) {
+            best = score
+            prefs.bestScore = best
+        }
         if (!next.canMove()) {
             over = true
             auto = false
+            prefs.clearSavedGame()
+        } else {
+            saveGame(next, score)
         }
     }
 
@@ -111,9 +128,20 @@ fun GameScreen() {
             auto = auto,
             onAutoChange = { auto = it },
             animate = animate,
-            onAnimateChange = { animate = it },
+            onAnimateChange = {
+                animate = it
+                prefs.animate = it
+            },
+            animationMs = animationMs,
+            onAnimationMsChange = {
+                animationMs = it
+                prefs.animationMs = it
+            },
             stepMs = stepMs,
-            onStepMsChange = { stepMs = it },
+            onStepMsChange = {
+                stepMs = it
+                prefs.stepMs = it
+            },
             onNewGame = {
                 startNewGame()
                 settingsOpen = false
@@ -192,6 +220,7 @@ fun GameScreen() {
                     move = lastMove,
                     seq = moveSeq,
                     animate = animate,
+                    animationMs = animationMs,
                     modifier = Modifier.fillMaxSize(),
                 )
                 if (over) {

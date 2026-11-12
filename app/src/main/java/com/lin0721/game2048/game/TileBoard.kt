@@ -132,12 +132,40 @@ class TileBoard(val tiles: List<Tile>) {
         return TileBoard(tiles + tile) to tile
     }
 
+    /** 存档编码：`id,value,row,col;...`，可以直接放进 SharedPreferences。 */
+    fun encode(): String =
+        tiles.joinToString(";") { "${it.id},${it.value},${it.row},${it.col}" }
+
     companion object {
         /** 新开一局：空棋盘上放两个方块。 */
         fun newGame(rand: Random = Random): TileBoard {
             var board = TileBoard(emptyList())
             repeat(2) { board = board.spawn(rand).first }
             return board
+        }
+
+        /**
+         * 解析 [encode] 的结果；格式不合法返回 null，坏存档不会把游戏卡住。
+         * 要求每个方块的面值是 2 的幂、行列不重复、id 不重复。
+         */
+        fun decode(text: String): TileBoard? {
+            if (text.isBlank()) return null
+            val tiles = ArrayList<Tile>()
+            val ids = HashSet<Int>()
+            val cells = HashSet<Int>()
+            for (part in text.split(';')) {
+                val fields = part.split(',')
+                if (fields.size != 4) return null
+                val id = fields[0].toIntOrNull() ?: return null
+                val value = fields[1].toIntOrNull() ?: return null
+                val row = fields[2].toIntOrNull() ?: return null
+                val col = fields[3].toIntOrNull() ?: return null
+                if (row !in 0 until 4 || col !in 0 until 4) return null
+                if (value < 2 || (value and (value - 1)) != 0) return null
+                if (!ids.add(id) || !cells.add(row * 4 + col)) return null
+                tiles += Tile(id, value, row, col)
+            }
+            return if (tiles.isEmpty()) null else TileBoard(tiles)
         }
     }
 }

@@ -32,9 +32,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.game2048.BuildConfig
+import com.lin0721.game2048.data.Prefs
 
 /** 自动步进的候选间隔（毫秒），越短 AI 走得越快。 */
 private val StepOptions = listOf(60, 90, 150)
+
+/** 动画时长的三档：毫秒 to 档位名。 */
+private val AnimationOptions = listOf(
+    Prefs.FAST_ANIMATION_MS to "快",
+    Prefs.DEFAULT_ANIMATION_MS to "标准",
+    Prefs.SLOW_ANIMATION_MS to "慢",
+)
 
 /**
  * 独立设置页：自动游玩、动画、步进间隔、新游戏与关于。
@@ -48,6 +56,8 @@ fun SettingsScreen(
     onAutoChange: (Boolean) -> Unit,
     animate: Boolean,
     onAnimateChange: (Boolean) -> Unit,
+    animationMs: Int,
+    onAnimationMsChange: (Int) -> Unit,
     stepMs: Int,
     onStepMsChange: (Int) -> Unit,
     onNewGame: () -> Unit,
@@ -84,6 +94,11 @@ fun SettingsScreen(
                 subtitle = "关闭后方块直接瞬移，适合性能较弱的设备",
                 checked = animate,
                 onCheckedChange = onAnimateChange,
+            )
+            AnimationRow(
+                animationMs = animationMs,
+                enabled = animate,
+                onAnimationMsChange = onAnimationMsChange,
             )
             StepRow(stepMs, onStepMsChange)
 
@@ -148,6 +163,31 @@ private fun SwitchRow(
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AnimationRow(
+    animationMs: Int,
+    enabled: Boolean,
+    onAnimationMsChange: (Int) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
+        Text("动画时长", color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp)
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AnimationOptions.forEach { (ms, label) ->
+                FilterChip(
+                    selected = animationMs == ms,
+                    onClick = { onAnimationMsChange(ms) },
+                    enabled = enabled,
+                    label = { Text("$label $ms ms") },
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Hint("滑动与合并的时长，关闭动画时不生效", Modifier.padding(top = 4.dp))
     }
 }
 

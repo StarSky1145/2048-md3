@@ -43,9 +43,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-/** 一次滑动 / 合并动画的时长，120ms 足够看清轨迹又不拖慢连滑。 */
-private const val SLIDE_MILLIS = 120
-
 private val TileGap = 8.dp
 private val TileCorner = 10.dp
 private val BoardCorner = 16.dp
@@ -56,7 +53,8 @@ private val EmptyCell = Color(0xFF2B272E)
  *
  * 每次移动由 [move] / [seq] 驱动一段滑动动画：[seq] 变化时按 [MoveResult]
  * 重新给每个方块设起点，再缓动到终点；合并的两个来源先滑进同一格，
- * 动画结束后换成面值翻倍的新方块并弹一下。关闭 [animate] 就是直接瞬移。
+ * 动画结束后换成面值翻倍的新方块并弹一下。关闭 [animate] 就是直接瞬移，
+ * 动画时长由设置页的 [animationMs] 决定（快 80 / 标准 140 / 慢 240）。
  */
 @Composable
 fun BoardView(
@@ -64,6 +62,7 @@ fun BoardView(
     move: MoveResult?,
     seq: Int,
     animate: Boolean,
+    animationMs: Int,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(
@@ -80,11 +79,19 @@ fun BoardView(
         val slides = remember(move) { move?.slides?.associateBy { it.id }.orEmpty() }
         val mergedIds = remember(move) { move?.merges?.map { it.intoId }?.toSet().orEmpty() }
 
+        // 只有"本实例内发生的新移动"才播动画：从设置页返回时 composition 会重建，
+        // 这时上一步的滑动数据还在，但不能再放一遍。
+        val seenSeq = remember { intArrayOf(seq) }
+        val freshMove = seenSeq[0] != seq
+        if (freshMove) seenSeq[0] = seq
+
+        val slideMs = if (animate) animationMs else 0
+
         // 合并时先让两个来源方块滑进去，滑完这一组"替身"就退场
-        var ghostsVisible by remember(seq) { mutableStateOf(animate) }
+        var ghostsVisible by remember(seq) { mutableStateOf(animate && freshMove) }
         LaunchedEffect(seq) {
             if (ghostsVisible) {
-                delay(SLIDE_MILLIS.toLong())
+                delay(slideMs.toLong())
                 ghostsVisible = false
             }
         }
@@ -102,8 +109,8 @@ fun BoardView(
         }
 
         board.tiles.forEach { tile ->
-            val slide = if (animate) slides[tile.id] else null
-            val merged = animate && tile.id in mergedIds
+            val slide = if (animate && freshMove) slides[tile.id] else null
+            val merged = animate && freshMove && tile.id in mergedIds
             key(tile.id, seq) {
                 AnimatedTile(
                     value = tile.value,
@@ -113,17 +120,18 @@ fun BoardView(
                     toY = tile.row * stepPx,
                     size = cell,
                     slide = slide != null,
-                    mergeDelay = if (merged) SLIDE_MILLIS else 0,
+                    slideMs = slideMs,
+                    mergeDelay = if (merged) slideMs else 0,
                     pulse = merged,
-                    fadeIn = animate && tile.id == move?.spawned?.id,
+                    fadeIn = animate && freshMove && tile.id == move?.spawned?.id,
                 )
             }
         }
 
         if (ghostsVisible) {
             move?.merges?.forEach { merge ->
-                GhostTile(merge.a, stepPx, cell, seq)
-                GhostTile(merge.b, stepPx, cell, seq)
+                GhostTile(merge.a, stepPx, cell, seq, slideMs)
+                GhostTile(merge.b, stepPx, cell, seq, slideMs)
             }
         }
     }
@@ -144,6 +152,7 @@ private fun AnimatedTile(
     toY: Float,
     size: Dp,
     slide: Boolean,
+    slideMs: Int,
     mergeDelay: Int,
     pulse: Boolean,
     fadeIn: Boolean,
@@ -159,13 +168,18 @@ private fun AnimatedTile(
                 delay(mergeDelay.toLong())
                 fadeAnim.snapTo(1f)
                 if (pulse) {
-                    scaleAnim.animateTo(1.15f, tween(70, easing = LinearOutSlowInEasing))
-                    scaleAnim.animateTo(1f, tween(90, easing = FastOutSlowInEasing))
+                    val upMs = (slideMs * 0.5f).roundToInt().coerceAtLeast(1)
+                    val downMs = (slideMs * 0.65f).roundToInt().coerceAtLeast(1)
+                    scaleAnim.animateTo(1.15f, tween(upMs, easing = LinearOutSlowInEasing))
+                    scaleAnim.animateTo(1f, tween(downMs, easing = FastOutSlowInEasing))
                 }
             }
-            if (fadeIn) launch { fadeAnim.animateTo(1f, tween(90, easing = LinearOutSlowInEasing)) }
+            if (fadeIn) {
+                val fadeMs = (slideMs * 0.65f).roundToInt().coerceAtLeast(1)
+                launch { fadeAnim.animateTo(1f, tween(fadeMs, easing = LinearOutSlowInEasing)) }
+            }
             if (slide) {
-                val spec = tween<Float>(SLIDE_MILLIS, easing = FastOutSlowInEasing)
+                val spec = tween<Float>(slideMs, easing = FastOutSlowInEasing)
                 launch { x.animateTo(toX, spec) }
                 launch { y.animateTo(toY, spec) }
             }
@@ -192,13 +206,13 @@ private fun AnimatedTile(
 
 /** 合并时滑进目标的"替身"方块：只负责把两个来源画到同一格，滑完就消失。 */
 @Composable
-private fun GhostTile(slide: Slide, stepPx: Float, size: Dp, seq: Int) {
+private fun GhostTile(slide: Slide, stepPx: Float, size: Dp, seq: Int, slideMs: Int) {
     key(slide.id, seq) {
         val x = remember { Animatable(slide.fromCol * stepPx) }
         val y = remember { Animatable(slide.fromRow * stepPx) }
         LaunchedEffect(Unit) {
             coroutineScope {
-                val spec = tween<Float>(SLIDE_MILLIS, easing = FastOutSlowInEasing)
+                val spec = tween<Float>(slideMs, easing = FastOutSlowInEasing)
                 launch { x.animateTo(slide.toCol * stepPx, spec) }
                 launch { y.animateTo(slide.toRow * stepPx, spec) }
             }
