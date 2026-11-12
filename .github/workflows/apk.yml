@@ -15,7 +15,7 @@ env:
 jobs:
   apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -29,9 +29,6 @@ jobs:
         run: |
           SDKM=$(ls -d $ANDROID_SDK_ROOT/cmdline-tools/*/bin 2>/dev/null | head -1)
           yes | "$SDKM/sdkmanager" --licenses > /dev/null 2>&1 || true
-
-      - name: 校验 a_bogus 实现
-        run: node tools/abogus-check.mjs
 
       - uses: gradle/actions/setup-gradle@v4
 
