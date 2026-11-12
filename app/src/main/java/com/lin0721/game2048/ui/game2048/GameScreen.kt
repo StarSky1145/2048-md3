@@ -9,23 +9,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.game2048.data.Prefs
+import com.lin0721.game2048.ui.ScreenScaffold
 import com.lin0721.game2048.core.Dir
 import com.lin0721.game2048.core.Expectimax
 import com.lin0721.game2048.core.MoveResult
@@ -164,12 +161,10 @@ fun GameScreen(prefs: Prefs, onBack: () -> Unit) {
         return
     }
 
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        // 小屏优先保证棋盘宽度：整页可滚动，棋盘内部自己消费拖拽
+    ScreenScaffold {
+        // 头两行固定高度，棋盘在剩下的安全区里取 min(宽, 高) 居中，小屏也不会被圆角切掉
         Column(
-            Modifier.fillMaxSize().safeDrawingPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+            Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -219,44 +214,56 @@ fun GameScreen(prefs: Prefs, onBack: () -> Unit) {
 
             Spacer(Modifier.height(4.dp))
 
-            Box(
-                Modifier.fillMaxWidth().aspectRatio(1f)
-                    .pointerInput(over) {
-                        var dx = 0f
-                        var dy = 0f
-                        detectDragGestures(
-                            onDragStart = { dx = 0f; dy = 0f },
-                            onDragEnd = {
-                                if (kotlin.math.abs(dx) > kotlin.math.abs(dy)) {
-                                    if (dx > 40f) play(Dir.RIGHT) else if (dx < -40f) play(Dir.LEFT)
-                                } else {
-                                    if (dy > 40f) play(Dir.DOWN) else if (dy < -40f) play(Dir.UP)
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                BoxWithConstraints {
+                    val side = minOf(maxWidth, maxHeight)
+                    Box(
+                        Modifier.size(side)
+                            .pointerInput(over) {
+                                var dx = 0f
+                                var dy = 0f
+                                detectDragGestures(
+                                    onDragStart = { dx = 0f; dy = 0f },
+                                    onDragEnd = {
+                                        if (kotlin.math.abs(dx) > kotlin.math.abs(dy)) {
+                                            if (dx > 40f) play(Dir.RIGHT) else if (dx < -40f) play(Dir.LEFT)
+                                        } else {
+                                            if (dy > 40f) play(Dir.DOWN) else if (dy < -40f) play(Dir.UP)
+                                        }
+                                    },
+                                ) { change, drag ->
+                                    change.consume()
+                                    dx += drag.x
+                                    dy += drag.y
                                 }
                             },
-                        ) { change, drag ->
-                            change.consume()
-                            dx += drag.x
-                            dy += drag.y
-                        }
-                    },
-            ) {
-                BoardView(
-                    board = board,
-                    move = lastMove,
-                    seq = moveSeq,
-                    animate = animate,
-                    animationMs = animationMs,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                if (over) {
-                    Box(
-                        Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(Color.Black.copy(alpha = 0.7f)),
-                        contentAlignment = Alignment.Center,
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("结束", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.height(8.dp))
-                            Text("得分 $score", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
+                        BoardView(
+                            board = board,
+                            move = lastMove,
+                            seq = moveSeq,
+                            animate = animate,
+                            animationMs = animationMs,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        if (over) {
+                            Box(
+                                Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp))
+                                    .background(Color.Black.copy(alpha = 0.7f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        "结束", color = Color.White,
+                                        fontSize = 24.sp, fontWeight = FontWeight.Bold,
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        "得分 $score", color = Color.White.copy(alpha = 0.8f),
+                                        fontSize = 13.sp,
+                                    )
+                                }
+                            }
                         }
                     }
                 }

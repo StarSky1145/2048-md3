@@ -11,23 +11,19 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,6 +48,7 @@ import com.lin0721.game2048.core.Minesweeper
 import com.lin0721.game2048.core.MinesweeperState
 import com.lin0721.game2048.core.MinesweeperStatus
 import com.lin0721.game2048.data.Prefs
+import com.lin0721.game2048.ui.ScreenScaffold
 import kotlinx.coroutines.delay
 
 /** 扫雷页：三档难度、长按/插旗模式、计时、难度确认与胜负弹窗。 */
@@ -112,11 +109,9 @@ fun MinesweeperScreen(prefs: Prefs, onBack: () -> Unit) {
 
     val best = prefs.bestMinesweeperSeconds(difficulty)
 
-    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    ScreenScaffold {
         Column(
-            Modifier.fillMaxSize().safeDrawingPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 4.dp),
+            Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 4.dp),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
@@ -168,12 +163,18 @@ fun MinesweeperScreen(prefs: Prefs, onBack: () -> Unit) {
 
             Spacer(Modifier.height(4.dp))
 
-            MineBoard(
-                game = game,
-                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
-                onTap = { tap(it) },
-                onLongPress = { longPress(it) },
-            )
+            // 网格在剩下的安全区里取 min(宽, 高) 居中，最外圈格子不会被圆角裁掉
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                BoxWithConstraints {
+                    val side = minOf(maxWidth, maxHeight)
+                    MineBoard(
+                        game = game,
+                        modifier = Modifier.size(side),
+                        onTap = { tap(it) },
+                        onLongPress = { longPress(it) },
+                    )
+                }
+            }
         }
     }
 
