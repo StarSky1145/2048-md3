@@ -16,7 +16,7 @@ data class JumpGame(
     val platforms: List<JumpPlatform>,
     val current: Int,
     val playerX: Float,
-    val score: Int,
+    val score: Int = 0,
     val status: JumpStatus = JumpStatus.PLAYING,
 ) {
     val nextPlatform: JumpPlatform? get() = platforms.getOrNull(current + 1)
