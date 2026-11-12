@@ -40,6 +40,7 @@ fun HubScreen(
     prefs: Prefs,
     onOpen2048: () -> Unit,
     onOpenMinesweeper: () -> Unit,
+    onOpenJump: () -> Unit,
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -80,6 +81,17 @@ fun HubScreen(
                 badge = "雷",
                 badgeColor = Color(0xFF3E5C76),
                 onClick = onOpenMinesweeper,
+            )
+
+            Spacer(Modifier.height(10.dp))
+
+            GameCard(
+                name = "跳一跳",
+                subtitle = "按住蓄力，松手起跳",
+                best = "最高分 ${prefs.bestJump}",
+                badge = "跳",
+                badgeColor = Color(0xFF6B4E8E),
+                onClick = onOpenJump,
             )
         }
     }

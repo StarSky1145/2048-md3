@@ -43,6 +43,13 @@ class Prefs(context: Context) {
             sp.edit().putInt(KEY_BEST_MINESWEEPER, value).apply()
         }
 
+    /** 跳一跳的最高分。 */
+    var bestJump: Int
+        get() = sp.getInt(KEY_BEST_JUMP, 0)
+        set(value) {
+            sp.edit().putInt(KEY_BEST_JUMP, value).apply()
+        }
+
     /** 当前牌局的棋盘编码，格式见 [com.lin0721.game2048.core.TileBoard.encode]。 */
     var savedGame: String?
         get() = sp.getString(KEY_SAVED_GAME, null)
@@ -75,5 +82,6 @@ class Prefs(context: Context) {
         private const val KEY_SAVED_GAME = "saved_game"
         private const val KEY_SAVED_SCORE = "saved_score"
         private const val KEY_BEST_MINESWEEPER = "best_minesweeper_seconds"
+        private const val KEY_BEST_JUMP = "best_jump"
     }
 }
