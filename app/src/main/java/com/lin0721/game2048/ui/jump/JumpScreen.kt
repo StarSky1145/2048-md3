@@ -2,7 +2,10 @@ package com.lin0721.game2048.ui.jump
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -31,121 +34,151 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.game2048.core.Jump
-import com.lin0721.game2048.core.JumpGame
 import com.lin0721.game2048.core.JumpResult
 import com.lin0721.game2048.core.JumpStatus
 import com.lin0721.game2048.data.Prefs
 import kotlinx.coroutines.delay
-import kotlin.math.PI
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
+/** 蓄满力的时长（毫秒）。 */
 private const val CHARGE_MS = 900f
-private const val JUMP_ANIM_MS = 340
-private const val PLAYER_RADIUS = 13f
-private const val PLATFORM_HEIGHT = 12f
-private const val ARC_HEIGHT = 110f
 
-/** 一次跳跃的动画数据：从旧位置飞到落点，动画结束后才落地。 */
-private data class JumpAnim(
-    val fromX: Float,
-    val toX: Float,
+/** 一次跳跃的动画时长（毫秒）。 */
+private const val FLIGHT_MS = 380
+
+/** 摔下去到弹失败框的时长（毫秒）。 */
+private const val FAIL_MS = 800
+
+/** 一次跳跃的动画数据：起飞点、落点、抛物线顶点与结算结果。 */
+private data class Flight(
+    val fromF: Float,
+    val toF: Float,
+    val apex: Float,
     val result: JumpResult,
 )
 
-/** 跳一跳页：按住蓄力、松手起跳，落地结算并更新最高分。 */
+/**
+ * 跳一跳页：等轴测 3D 渲染，按住蓄力、松手起跳。
+ *
+ * 手感参数沿用老版本（0.9 秒满蓄力、110–240 的平台间距、落中心加分），
+ * 只把表现换成 3D：落地后相机平移到新方块偏下的锚点，角色在 3D 空间走抛物线，
+ * 失败时向前翻滚摔出画面，0.8 秒后弹结算框。
+ */
 @Composable
 fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
     var game by remember { mutableStateOf(Jump.newGame()) }
+    var gameSeq by remember { mutableIntStateOf(0) }
     var charging by remember { mutableStateOf(false) }
     var power by remember { mutableFloatStateOf(0f) }
-    var anim by remember { mutableStateOf<JumpAnim?>(null) }
+    var flight by remember { mutableStateOf<Flight?>(null) }
+    var deadF by remember { mutableFloatStateOf(0f) }
     var showResult by remember { mutableStateOf(false) }
     var newRecord by remember { mutableStateOf(false) }
 
-    val jumpProgress = remember { Animatable(1f) }
+    val jumpT = remember { Animatable(0f) }
+    val fallT = remember { Animatable(0f) }
+    val rebound = remember { Animatable(1f) }
+    val camera = remember { Animatable(game.platforms[0].center) }
+    val stage = remember { IsoStage() }
 
     BackHandler(onBack = onBack)
 
     // 蓄力进度：按住后 0.9 秒到满
     LaunchedEffect(charging) {
         if (!charging) return@LaunchedEffect
-        val started = System.currentTimeMillis()
-        while (charging) {
-            val progress = ((System.currentTimeMillis() - started) / CHARGE_MS).coerceIn(0f, 1f)
-            power = progress
-            if (progress >= 1f) break
+        val started = System.nanoTime()
+        while (true) {
+            val elapsedMs = (System.nanoTime() - started) / 1_000_000f
+            power = (elapsedMs / CHARGE_MS).coerceIn(0f, 1f)
+            if (power >= 1f) break
             delay(16)
         }
     }
 
-    // 跳跃动画放完再应用落点结果，角色不会中途瞬移
-    LaunchedEffect(anim) {
-        val current = anim ?: return@LaunchedEffect
-        jumpProgress.snapTo(0f)
-        jumpProgress.animateTo(1f, tween(JUMP_ANIM_MS, easing = LinearEasing))
+    // 重开一局时把动画状态一起归零，避免上一局的摔落进度残留
+    LaunchedEffect(gameSeq) {
+        jumpT.snapTo(0f)
+        fallT.snapTo(0f)
+        rebound.snapTo(1f)
+    }
+
+    // 落地后整体平移，把新方块送回屏幕偏下的锚点
+    LaunchedEffect(gameSeq, game.current) {
+        val target = game.platforms[game.current].center
+        if (game.current == 0) {
+            camera.snapTo(target)
+        } else {
+            camera.animateTo(target, tween(300, easing = FastOutSlowInEasing))
+        }
+    }
+
+    // 飞行放完再结算；失败再补一段翻滚下落
+    LaunchedEffect(flight) {
+        val current = flight ?: return@LaunchedEffect
+        jumpT.snapTo(0f)
+        fallT.snapTo(0f)
+        jumpT.animateTo(1f, tween(FLIGHT_MS, easing = LinearEasing))
         game = current.result.next
         if (game.score > prefs.bestJump) {
             prefs.bestJump = game.score
             newRecord = true
         }
-        if (game.status == JumpStatus.OVER) showResult = true
-        anim = null
+        if (game.status == JumpStatus.OVER) {
+            deadF = current.result.landingX
+            fallT.animateTo(1f, tween(FAIL_MS, easing = FastOutSlowInEasing))
+            showResult = true
+        } else {
+            // 落地压扁再回弹
+            rebound.snapTo(0.68f)
+            rebound.animateTo(
+                1f,
+                spring(dampingRatio = 0.36f, stiffness = Spring.StiffnessMediumLow),
+            )
+        }
+        flight = null
     }
 
     fun restart() {
         game = Jump.newGame()
+        gameSeq++
         charging = false
         power = 0f
-        anim = null
+        flight = null
+        deadF = 0f
         showResult = false
         newRecord = false
     }
 
     fun release() {
-        if (game.status != JumpStatus.PLAYING || anim != null) return
+        if (game.status != JumpStatus.PLAYING || flight != null) return
         val distance = Jump.MIN_JUMP + power * (Jump.MAX_JUMP - Jump.MIN_JUMP)
         val result = Jump.jump(game, distance)
         power = 0f
-        anim = JumpAnim(game.playerX, result.landingX, result)
-    }
-
-    val currentAnim = anim
-    val progress = jumpProgress.value
-    val displayX = if (currentAnim != null) {
-        currentAnim.fromX + (currentAnim.toX - currentAnim.fromX) * progress
-    } else {
-        game.playerX
-    }
-    val lift = if (currentAnim != null) {
-        (sin(PI * progress) * ARC_HEIGHT).toFloat()
-    } else {
-        0f
+        flight = Flight(
+            fromF = game.playerX,
+            toF = result.landingX,
+            apex = 90f + distance * 0.45f,
+            result = result,
+        )
     }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize()) {
-            JumpStage(
-                game = game,
-                playerX = displayX,
-                playerLift = lift,
-                modifier = Modifier.fillMaxSize().pointerInput(game.status, anim) {
-                    if (game.status != JumpStatus.PLAYING || anim != null) return@pointerInput
+            Canvas(
+                Modifier.fillMaxSize().pointerInput(game.status, flight) {
+                    if (game.status != JumpStatus.PLAYING || flight != null) return@pointerInput
                     detectTapGestures(
                         onPress = {
                             charging = true
@@ -156,7 +189,47 @@ fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
                         },
                     )
                 },
-            )
+            ) {
+                val anchorX = size.width * 0.30f
+                val anchorY = size.height * 0.68f
+
+                val charge = if (charging) power else 0f
+                val squash = if (charging) charge else (1f - rebound.value).coerceIn(0f, 1f)
+                val t = jumpT.value
+                val fall = fallT.value
+                val flying = flight
+
+                val playerF: Float
+                val playerH: Float
+                var tilt = 0f
+                if (fall > 0f) {
+                    // 失败：继续往前、加速下落、同时翻滚
+                    playerF = deadF + fall * 130f
+                    playerH = -fall * fall * 360f
+                    tilt = fall * 330f
+                } else if (flying != null) {
+                    playerF = flying.fromF + (flying.toF - flying.fromF) * t
+                    playerH = parabola(t, flying.apex)
+                } else {
+                    playerF = game.playerX
+                    playerH = 0f
+                }
+
+                stage.draw(
+                    scope = this,
+                    platforms = game.platforms,
+                    currentIndex = game.current,
+                    cameraF = camera.value,
+                    playerF = playerF,
+                    playerH = playerH,
+                    squash = squash,
+                    sink = charge * 5f,
+                    fallT = if (fall > 0f) 1f else 0f,
+                    tilt = tilt,
+                    anchorX = anchorX,
+                    anchorY = anchorY,
+                )
+            }
 
             Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                 Row(
@@ -193,25 +266,8 @@ fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
 
                 Spacer(Modifier.weight(1f))
 
-                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
-                    Text(
-                        if (charging) "蓄力 ${(power * 100).roundToInt()}%" else "按住蓄力，松手起跳",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Box(
-                        Modifier.fillMaxWidth().height(6.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                    ) {
-                        if (power > 0f) {
-                            Box(
-                                Modifier.fillMaxWidth(power.coerceIn(0f, 1f)).fillMaxHeight()
-                                    .background(MaterialTheme.colorScheme.primary),
-                            )
-                        }
-                    }
-                }
+                // 蓄力条单独成一个 composable，读 power 时只有它重组，画布不受影响
+                ChargeBar(charging = charging, power = { power })
             }
         }
     }
@@ -244,52 +300,27 @@ fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
     }
 }
 
-/** 画布：平台、中心奖励点、角色与落地影子，坐标以 dp 世界坐标换算。 */
+/** 蓄力指示：单独重组，避免按住时整页跟着重组。 */
 @Composable
-private fun JumpStage(
-    game: JumpGame,
-    playerX: Float,
-    playerLift: Float,
-    modifier: Modifier,
-) {
-    Canvas(modifier) {
-        val scale = density
-        val groundY = size.height * 0.72f
-        val camera = playerX - (size.width / scale) * 0.28f
-        val platformTop = groundY - PLATFORM_HEIGHT * scale
-        val radius = PLAYER_RADIUS * scale
-
-        for (platform in game.platforms) {
-            val left = (platform.left - camera) * scale
-            val width = platform.width * scale
-            if (left + width < 0f || left > size.width) continue
-            drawRoundRect(
-                color = Color(0xFF3A3540),
-                topLeft = Offset(left, platformTop),
-                size = Size(width, PLATFORM_HEIGHT * scale),
-                cornerRadius = CornerRadius(6f * scale),
-            )
-            drawCircle(
-                color = Color(0xFFEFB8C8).copy(alpha = 0.7f),
-                radius = 2.5f * scale,
-                center = Offset((platform.center - camera) * scale, platformTop - 6f * scale),
-            )
+private fun ChargeBar(charging: Boolean, power: () -> Float) {
+    val p = if (charging) power().coerceIn(0f, 1f) else 0f
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
+        Text(
+            if (charging) "蓄力 ${(p * 100).roundToInt()}%" else "按住蓄力，松手起跳",
+            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp,
+        )
+        Spacer(Modifier.height(6.dp))
+        Box(
+            Modifier.fillMaxWidth().height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            if (p > 0f) {
+                Box(
+                    Modifier.fillMaxWidth(p).fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.primary),
+                )
+            }
         }
-
-        val playerCenter = Offset(
-            x = (playerX - camera) * scale,
-            y = groundY - playerLift * scale - radius,
-        )
-        drawCircle(
-            color = Color.Black.copy(alpha = 0.25f),
-            radius = radius * 0.75f,
-            center = Offset(playerCenter.x, groundY - 2f * scale),
-        )
-        drawCircle(color = Color(0xFFEFB8C8), radius = radius, center = playerCenter)
-        drawCircle(
-            color = Color.White.copy(alpha = 0.35f),
-            radius = radius * 0.28f,
-            center = Offset(playerCenter.x - radius * 0.3f, playerCenter.y - radius * 0.3f),
-        )
     }
 }
