@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 应用图标背景：深色径向渐变，中心微亮、四周更暗，不裁切也能铺满整块图标。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path android:pathData="M0,0H108V108H0Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="54"
+                android:centerY="42"
+                android:endColor="#121014"
+                android:gradientRadius="78"
+                android:startColor="#1E1A22"
+                android:type="radial" />
+        </aapt:attr>
+    </path>
+</vector>

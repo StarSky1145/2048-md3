@@ -1,8 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 应用图标前景：两枚 45° 斜放的圆角方块，左下大、右上小，玫红到暖橙渐变。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#B4643C" android:pathData="M24,28h24v24h-24z"/>
-    <path android:fillColor="#3E5C76" android:pathData="M60,28h24v24h-24z"/>
-    <path android:fillColor="#6B4E8E" android:pathData="M24,60h24v24h-24z"/>
-    <path android:fillColor="#EFB8C8" android:pathData="M60,60h24v24h-24z"/>
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 大块的投影 -->
+    <group android:rotation="45" android:pivotX="44.5" android:pivotY="66.5">
+        <path
+            android:fillAlpha="0.5"
+            android:fillColor="#08070A"
+            android:pathData="M35.5,50.5H53.5A7,7 0 0 1 60.5,57.5V75.5A7,7 0 0 1 53.5,82.5H35.5A7,7 0 0 1 28.5,75.5V57.5A7,7 0 0 1 35.5,50.5Z" />
+    </group>
+
+    <!-- 左下大块 -->
+    <group android:rotation="45" android:pivotX="43" android:pivotY="64">
+        <path android:pathData="M34,48H52A7,7 0 0 1 59,55V73A7,7 0 0 1 52,80H34A7,7 0 0 1 27,73V55A7,7 0 0 1 34,48Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:endColor="#E08A4E"
+                    android:endX="59"
+                    android:endY="80"
+                    android:startColor="#EFB8C8"
+                    android:startX="27"
+                    android:startY="48"
+                    android:type="linear" />
+            </aapt:attr>
+        </path>
+    </group>
+
+    <!-- 小块的投影 -->
+    <group android:rotation="45" android:pivotX="71.5" android:pivotY="40.5">
+        <path
+            android:fillAlpha="0.45"
+            android:fillColor="#08070A"
+            android:pathData="M65.5,29.5H77.5A5,5 0 0 1 82.5,34.5V46.5A5,5 0 0 1 77.5,51.5H65.5A5,5 0 0 1 60.5,46.5V34.5A5,5 0 0 1 65.5,29.5Z" />
+    </group>
+
+    <!-- 右上小块 -->
+    <group android:rotation="45" android:pivotX="70" android:pivotY="38">
+        <path android:pathData="M64,27H76A5,5 0 0 1 81,32V44A5,5 0 0 1 76,49H64A5,5 0 0 1 59,44V32A5,5 0 0 1 64,27Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:endColor="#E08A4E"
+                    android:endX="81"
+                    android:endY="49"
+                    android:startColor="#F6C9D6"
+                    android:startX="59"
+                    android:startY="27"
+                    android:type="linear" />
+            </aapt:attr>
+        </path>
+    </group>
 </vector>
