@@ -1,9 +1,5 @@
 package com.lin0721.game2048.ui
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -18,8 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -40,36 +40,87 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.lin0721.game2048.game.Board
 import com.lin0721.game2048.game.Dir
 import com.lin0721.game2048.game.Expectimax
+import com.lin0721.game2048.game.MoveResult
+import com.lin0721.game2048.game.TileBoard
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
+/** 自动游玩的默认步进间隔（毫秒），与设置页的 150ms 档一致。 */
+private const val DEFAULT_STEP_MS = 150
+
+/**
+ * 一局 2048 的全部界面状态：棋盘、分数、自动游玩、动画开关与设置页导航。
+ *
+ * 棋盘状态放在这里而不是设置页里，所以打开设置再返回时牌局不会丢。
+ */
 @Composable
 fun GameScreen() {
-    var board by remember { mutableStateOf(Board.newGame()) }
+    var board by remember { mutableStateOf(TileBoard.newGame()) }
+    var lastMove by remember { mutableStateOf<MoveResult?>(null) }
+    var moveSeq by remember { mutableIntStateOf(0) }
     var score by remember { mutableIntStateOf(0) }
     var best by remember { mutableIntStateOf(0) }
     var auto by remember { mutableStateOf(false) }
     var over by remember { mutableStateOf(false) }
+    var settingsOpen by remember { mutableStateOf(false) }
+    var animate by remember { mutableStateOf(true) }
+    var stepMs by remember { mutableIntStateOf(DEFAULT_STEP_MS) }
 
-    fun play(dir: Dir) {
-        if (over) return
-        val (next, moved, gained) = board.move(dir)
-        if (!moved) return
-        next.spawn()
-        board = next
-        score += gained
-        if (score > best) best = score
-        if (!next.canMove()) { over = true; auto = false }
+    fun startNewGame() {
+        board = TileBoard.newGame()
+        lastMove = null
+        moveSeq++
+        score = 0
+        over = false
+        auto = false
     }
 
-    LaunchedEffect(auto) {
-        while (auto && !over) {
-            delay(90)
-            val dir = Expectimax.bestMove(board) ?: break
+    /** 走一步：先按规则移动，再补一个新方块，最后把整段变化交给 UI 做动画。 */
+    fun play(dir: Dir) {
+        if (over) return
+        val result = board.move(dir)
+        if (!result.moved) return
+        val (next, spawned) = TileBoard(result.tiles).spawn()
+        board = next
+        lastMove = result.copy(tiles = next.tiles, spawned = spawned)
+        moveSeq++
+        score += result.gained
+        if (score > best) best = score
+        if (!next.canMove()) {
+            over = true
+            auto = false
+        }
+    }
+
+    // 自动游玩：按设置里的间隔循环，搜索放到后台线程，避免拖慢滑动动画
+    LaunchedEffect(auto, stepMs, settingsOpen) {
+        while (auto && !over && !settingsOpen) {
+            delay(stepMs.toLong())
+            if (!auto || over || settingsOpen) break
+            val snapshot = board.toBoard()
+            val dir = withContext(Dispatchers.Default) { Expectimax.bestMove(snapshot) } ?: break
             play(dir)
         }
+    }
+
+    if (settingsOpen) {
+        SettingsScreen(
+            auto = auto,
+            onAutoChange = { auto = it },
+            animate = animate,
+            onAnimateChange = { animate = it },
+            stepMs = stepMs,
+            onStepMsChange = { stepMs = it },
+            onNewGame = {
+                startNewGame()
+                settingsOpen = false
+            },
+            onBack = { settingsOpen = false },
+        )
+        return
     }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -77,21 +128,36 @@ fun GameScreen() {
             Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text("2048", color = MaterialTheme.colorScheme.onBackground, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                    Text("合并方块，凑出 2048", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "2048", color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 28.sp, fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        "合并方块，凑出 2048", color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                    )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     ScoreCard("得分", score)
                     ScoreCard("最高", best)
+                    IconButton(onClick = { settingsOpen = true }) {
+                        Icon(
+                            Icons.Filled.Settings, contentDescription = "设置",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
-                    onClick = { board = Board.newGame(); score = 0; over = false; auto = false },
+                    onClick = { startNewGame() },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 ) { Text("新游戏") }
                 OutlinedButton(
@@ -106,9 +172,6 @@ fun GameScreen() {
 
             Box(
                 Modifier.fillMaxWidth().aspectRatio(1f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(8.dp)
                     .pointerInput(over) {
                         var dx = 0f
                         var dy = 0f
@@ -124,16 +187,16 @@ fun GameScreen() {
                         ) { _, drag -> dx += drag.x; dy += drag.y }
                     },
             ) {
-                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (r in 0 until 4) {
-                        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            for (c in 0 until 4) Tile(board.cells[r * 4 + c], Modifier.weight(1f).fillMaxSize())
-                        }
-                    }
-                }
+                BoardView(
+                    board = board,
+                    move = lastMove,
+                    seq = moveSeq,
+                    animate = animate,
+                    modifier = Modifier.fillMaxSize(),
+                )
                 if (over) {
                     Box(
-                        Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(Color.Black.copy(alpha = 0.7f)),
+                        Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(Color.Black.copy(alpha = 0.7f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -157,46 +220,11 @@ fun GameScreen() {
 @Composable
 private fun ScoreCard(label: String, value: Int) {
     Column(
-        Modifier.clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp, vertical = 6.dp),
+        Modifier.clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
         Text(value.toString(), color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     }
-}
-
-@Composable
-private fun Tile(value: Int, modifier: Modifier = Modifier) {
-    val (bg, fg) = tileColors(value)
-    val scale = remember { Animatable(1f) }
-    LaunchedEffect(value) {
-        if (value != 0) {
-            scale.snapTo(1.12f)
-            scale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
-        }
-    }
-    Box(modifier.scale(scale.value).clip(RoundedCornerShape(10.dp)).background(bg), contentAlignment = Alignment.Center) {
-        if (value != 0) {
-            Text(
-                value.toString(), color = fg,
-                fontSize = when { value < 100 -> 24.sp; value < 1000 -> 20.sp; else -> 16.sp },
-                fontWeight = FontWeight.Bold,
-            )
-        }
-    }
-}
-
-private fun tileColors(value: Int): Pair<Color, Color> = when (value) {
-    0 -> Color(0xFF2B272E) to Color.Transparent
-    2 -> Color(0xFF3A3540) to Color(0xFFEDE0E3)
-    4 -> Color(0xFF4A4350) to Color(0xFFEDE0E3)
-    8 -> Color(0xFFB4643C) to Color.White
-    16 -> Color(0xFFC97545) to Color.White
-    32 -> Color(0xFFD3794A) to Color.White
-    64 -> Color(0xFFE08A4E) to Color.White
-    128 -> Color(0xFFE6C35C) to Color(0xFF3A2E10)
-    256 -> Color(0xFFEAD06A) to Color(0xFF3A2E10)
-    512 -> Color(0xFFEFDB79) to Color(0xFF3A2E10)
-    1024 -> Color(0xFFD8C7F0) to Color(0xFF2A2038)
-    else -> Color(0xFFC9B6F2) to Color(0xFF231A33)
 }

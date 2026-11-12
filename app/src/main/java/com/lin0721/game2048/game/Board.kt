@@ -5,6 +5,21 @@ import kotlin.random.Random
 enum class Dir { UP, DOWN, LEFT, RIGHT }
 
 /**
+ * 一条线向左滑动并合并后的完整结果。
+ *
+ * [values] 是合并后的四个值；[fromA] / [fromB] 记录每个输出格在原始线里的来源下标
+ * （-1 表示该格为空；[fromB] 只在合并时有值）。带上来源信息后，[TileBoard]
+ * 才能知道某个方块的 id 从哪一格搬到了哪一格，UI 也才能做滑动动画。
+ */
+class LineSlide(
+    val values: IntArray,
+    val fromA: IntArray,
+    val fromB: IntArray,
+    val merged: BooleanArray,
+    val score: Int,
+)
+
+/**
  * 2048 棋盘：16 个格子，0 表示空。
  * 移动逻辑与 AI 共用同一套"把一维线合并"的实现，避免两边规则漂移。
  */
@@ -30,31 +45,15 @@ class Board(val cells: IntArray = IntArray(16)) {
         var moved = false
         var gained = 0
         for (i in 0 until 4) {
-            val line = IntArray(4) { j -> valueAt(dir, i, j) }
-            val (merged, score) = slide(line)
-            gained += score
+            val line = IntArray(4) { j -> cells[index(dir, i, j)] }
+            val result = slideLine(line)
+            gained += result.score
             for (j in 0 until 4) {
-                if (merged[j] != line[j]) moved = true
-                setLine(dir, i, j, merged[j], out)
+                if (result.values[j] != line[j]) moved = true
+                out[index(dir, i, j)] = result.values[j]
             }
         }
         return Triple(Board(out), moved, gained)
-    }
-
-    private fun valueAt(dir: Dir, i: Int, j: Int): Int = when (dir) {
-        Dir.LEFT -> cells[i * 4 + j]
-        Dir.RIGHT -> cells[i * 4 + (3 - j)]
-        Dir.UP -> cells[j * 4 + i]
-        Dir.DOWN -> cells[(3 - j) * 4 + i]
-    }
-
-    private fun setLine(dir: Dir, i: Int, j: Int, value: Int, out: IntArray) {
-        when (dir) {
-            Dir.LEFT -> out[i * 4 + j] = value
-            Dir.RIGHT -> out[i * 4 + (3 - j)] = value
-            Dir.UP -> out[j * 4 + i] = value
-            Dir.DOWN -> out[(3 - j) * 4 + i] = value
-        }
     }
 
     fun canMove(): Boolean {
@@ -74,25 +73,46 @@ class Board(val cells: IntArray = IntArray(16)) {
             return b
         }
 
-        /** 一条线向左滑动并合并，返回合并后的线与得分。 */
-        fun slide(line: IntArray): Pair<IntArray, Int> {
-            val compact = line.filter { it != 0 }.toMutableList()
-            val merged = mutableListOf<Int>()
+        /**
+         * 把"方向 + 第 i 条线 + 线内第 j 格"映射成 16 格数组下标。
+         * 四个方向的坐标系都从"移动的最前方"开始编号，这样滑动方向永远是向 0。
+         */
+        fun index(dir: Dir, i: Int, j: Int): Int = when (dir) {
+            Dir.LEFT -> i * 4 + j
+            Dir.RIGHT -> i * 4 + (3 - j)
+            Dir.UP -> j * 4 + i
+            Dir.DOWN -> (3 - j) * 4 + i
+        }
+
+        /** 一条线向左滑动并合并；棋盘移动与瓦片动画共用这一套规则。 */
+        fun slideLine(line: IntArray): LineSlide {
+            val values = IntArray(4)
+            val fromA = IntArray(4) { -1 }
+            val fromB = IntArray(4) { -1 }
+            val merged = BooleanArray(4)
             var score = 0
-            var i = 0
-            while (i < compact.size) {
-                if (i + 1 < compact.size && compact[i] == compact[i + 1]) {
-                    val v = compact[i] * 2
-                    merged += v
-                    score += v
-                    i += 2
+            var out = 0
+
+            val filled = (0 until 4).filter { line[it] != 0 }
+            var k = 0
+            while (k < filled.size) {
+                val a = filled[k]
+                if (k + 1 < filled.size && line[filled[k + 1]] == line[a]) {
+                    val b = filled[k + 1]
+                    values[out] = line[a] * 2
+                    fromA[out] = a
+                    fromB[out] = b
+                    merged[out] = true
+                    score += values[out]
+                    k += 2
                 } else {
-                    merged += compact[i]
-                    i++
+                    values[out] = line[a]
+                    fromA[out] = a
+                    k += 1
                 }
+                out++
             }
-            while (merged.size < 4) merged += 0
-            return merged.toIntArray() to score
+            return LineSlide(values, fromA, fromB, merged, score)
         }
     }
 }
