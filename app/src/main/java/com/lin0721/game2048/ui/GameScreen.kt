@@ -210,7 +210,7 @@ fun GameScreen() {
 
             Spacer(Modifier.height(10.dp))
             Text(
-                if (auto) "AI 正在走：expectimax 3 层" else "滑动方块，或点自动游玩看 AI 下",
+                if (auto) "AI 正在走：expectimax 4 层" else "滑动方块，或点自动游玩看 AI 下",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, textAlign = TextAlign.Center,
             )
         }
