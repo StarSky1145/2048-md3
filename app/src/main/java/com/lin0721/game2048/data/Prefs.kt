@@ -36,6 +36,13 @@ class Prefs(context: Context) {
             sp.edit().putInt(KEY_BEST_SCORE, value).apply()
         }
 
+    /** 扫雷的最短通关用时（秒），0 表示还没通关过。 */
+    var bestMinesweeperSeconds: Int
+        get() = sp.getInt(KEY_BEST_MINESWEEPER, 0)
+        set(value) {
+            sp.edit().putInt(KEY_BEST_MINESWEEPER, value).apply()
+        }
+
     /** 当前牌局的棋盘编码，格式见 [com.lin0721.game2048.core.TileBoard.encode]。 */
     var savedGame: String?
         get() = sp.getString(KEY_SAVED_GAME, null)
@@ -67,5 +74,6 @@ class Prefs(context: Context) {
         private const val KEY_BEST_SCORE = "best_score"
         private const val KEY_SAVED_GAME = "saved_game"
         private const val KEY_SAVED_SCORE = "saved_score"
+        private const val KEY_BEST_MINESWEEPER = "best_minesweeper_seconds"
     }
 }

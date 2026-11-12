@@ -39,6 +39,7 @@ import com.lin0721.game2048.data.Prefs
 fun HubScreen(
     prefs: Prefs,
     onOpen2048: () -> Unit,
+    onOpenMinesweeper: () -> Unit,
 ) {
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
@@ -65,8 +66,29 @@ fun HubScreen(
                 badgeColor = Color(0xFFB4643C),
                 onClick = onOpen2048,
             )
+
+            Spacer(Modifier.height(10.dp))
+
+            GameCard(
+                name = "扫雷",
+                subtitle = "9×9 · 10 颗雷，首点必安全",
+                best = if (prefs.bestMinesweeperSeconds > 0) {
+                    "最快 ${formatDuration(prefs.bestMinesweeperSeconds)}"
+                } else {
+                    "尚未通关"
+                },
+                badge = "雷",
+                badgeColor = Color(0xFF3E5C76),
+                onClick = onOpenMinesweeper,
+            )
         }
     }
+}
+
+private fun formatDuration(seconds: Int): String {
+    val m = seconds / 60
+    val s = seconds % 60
+    return (if (m < 10) "0$m" else "$m") + ":" + (if (s < 10) "0$s" else "$s")
 }
 
 @Composable
