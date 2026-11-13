@@ -51,6 +51,8 @@ import com.lin0721.game2048.core.JumpStatus
 import com.lin0721.game2048.data.Prefs
 import com.lin0721.game2048.ui.LocalUiMetrics
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import kotlin.math.roundToInt
 
 /** 蓄满力的时长（毫秒）。 */
@@ -84,6 +86,7 @@ fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
     var charging by remember { mutableStateOf(false) }
     var power by remember { mutableFloatStateOf(0f) }
     var flight by remember { mutableStateOf<Flight?>(null) }
+    val scope = rememberCoroutineScope()
     var deadF by remember { mutableFloatStateOf(0f) }
     var showResult by remember { mutableStateOf(false) }
     var newRecord by remember { mutableStateOf(false) }
@@ -168,12 +171,18 @@ fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
         val distance = Jump.MIN_JUMP + power * (Jump.MAX_JUMP - Jump.MIN_JUMP)
         val result = Jump.jump(game, distance)
         power = 0f
-        flight = Flight(
+        // 先把飞行进度归零，再挂上 flight：否则这一帧用的还是上一跳的 jumpT(=1)，
+        // 角色会在终点闪一下才回到起点
+        val pending = Flight(
             fromF = game.playerX,
             toF = result.landingX,
             apex = 90f + distance * 0.45f,
             result = result,
         )
+        scope.launch {
+            jumpT.snapTo(0f)
+            flight = pending
+        }
     }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
