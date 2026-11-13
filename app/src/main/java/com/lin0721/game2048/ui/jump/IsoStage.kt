@@ -101,19 +101,22 @@ internal class IsoStage {
             val x0 = anchorX + (from - cameraF) * ISO_X * scale
             val x1 = anchorX + (to - cameraF) * ISO_X * scale
             val y1 = anchorY - ((to - cameraF) * ISO_Y + CUBE_HEIGHT) * scale
+            val dashes = androidx.compose.ui.graphics.Path()
             var k = 0f
             while (k < 1f) {
-                val a = k
                 val b = (k + 0.055f).coerceAtMost(1f)
-                drawLine(
-                    color = guideColor,
-                    start = androidx.compose.ui.geometry.Offset(x0 + (x1 - x0) * a, y0 + (y1 - y0) * a),
-                    end = androidx.compose.ui.geometry.Offset(x0 + (x1 - x0) * b, y0 + (y1 - y0) * b),
-                    strokeWidth = 2f * scale,
-                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                )
+                dashes.moveTo(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k)
+                dashes.lineTo(x0 + (x1 - x0) * b, y0 + (y1 - y0) * b)
                 k += 0.11f
             }
+            scope.drawPath(
+                dashes,
+                guideColor,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = 2f * scale,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                ),
+            )
         }
         drawPlayer(
             scope = scope,
