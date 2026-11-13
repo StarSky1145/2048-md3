@@ -15,8 +15,8 @@ android {
         applicationId = "com.lin0721.game2048"
         minSdk = 26
         targetSdk = 36
-        versionCode = 15
-        versionName = "0.4.7"
+        versionCode = 16
+        versionName = "0.4.8"
     }
 
     buildTypes {

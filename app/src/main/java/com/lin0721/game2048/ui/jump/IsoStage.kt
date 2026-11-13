@@ -30,6 +30,32 @@ import kotlin.math.sin
 internal class IsoStage {
 
     /** 三个面的复用 Path。 */
+    private enum class JumpKind { NORMAL, BONUS, SPRING, NARROW, HEAVY }
+    private enum class JumpShape { BOX, CYLINDER, HEX }
+
+    private fun kindOf(i: Int): JumpKind = when {
+        i < 5 -> JumpKind.NORMAL
+        i % 7 == 0 -> JumpKind.BONUS
+        i % 6 == 0 -> JumpKind.SPRING
+        i % 5 == 0 -> JumpKind.NARROW
+        i % 11 == 0 -> JumpKind.HEAVY
+        else -> JumpKind.NORMAL
+    }
+
+    private fun shapeOf(i: Int): JumpShape = when (i % 3) {
+        1 -> JumpShape.CYLINDER
+        2 -> JumpShape.HEX
+        else -> JumpShape.BOX
+    }
+
+    private fun topColor(k: JumpKind): androidx.compose.ui.graphics.Color = when (k) {
+        JumpKind.NORMAL -> TOP_IDLE
+        JumpKind.BONUS -> androidx.compose.ui.graphics.Color(0xFFE6C35C)
+        JumpKind.SPRING -> androidx.compose.ui.graphics.Color(0xFF6FCF97)
+        JumpKind.NARROW -> androidx.compose.ui.graphics.Color(0xFFEF9BB6)
+        JumpKind.HEAVY -> androidx.compose.ui.graphics.Color(0xFFA88BD6)
+    }
+
     private val guideColor = androidx.compose.ui.graphics.Color(0x99EFB8C8)
 
     private val faceTop = Path()
@@ -64,7 +90,7 @@ internal class IsoStage {
             val current = i == currentIndex
             val drop = if (current) sink else 0f
             val cy = anchorY - (df * ISO_Y + CUBE_HEIGHT - drop) * scale
-            drawCube(scope, cx, cy, scale, current)
+            drawCube(scope, cx, cy, scale, current, kindOf(i), shapeOf(i))
         }
         // 蓄力辅助线：从当前方块前沿沿 +f 铺到预计落点，长度就是这一跳能到的位置
         if (chargeDistance > 0f) {
@@ -103,7 +129,15 @@ internal class IsoStage {
         )
     }
 
-    private fun drawCube(scope: DrawScope, cx: Float, cy: Float, scale: Float, current: Boolean) {
+    private fun drawCube(
+        scope: DrawScope,
+        cx: Float,
+        cy: Float,
+        scale: Float,
+        current: Boolean,
+        kind: JumpKind,
+        shape: JumpShape,
+    ) {
         val hx = CUBE_HALF * ISO_X * scale
         val hy = CUBE_HALF * ISO_Y * scale
         val down = CUBE_HEIGHT * scale
@@ -147,8 +181,22 @@ internal class IsoStage {
         faceTop.lineTo(vx[2], vy[2])
         faceTop.lineTo(vx[3], vy[3])
         faceTop.close()
-        scope.drawPath(faceTop, if (current) TOP_CURRENT else TOP_IDLE)
+        scope.drawPath(faceTop, if (current) TOP_CURRENT else topColor(kind))
         scope.drawPath(faceTop, EDGE, style = EDGE_STROKE)
+
+        // 形状装饰：圆柱用椭圆收顶，六棱柱加两条棱线
+        when (shape) {
+            JumpShape.CYLINDER -> {
+                val top = if (current) TOP_CURRENT else topColor(kind)
+                scope.drawOval(color = top, topLeft = Offset(cx - hx, cy - hy), size = Size(2f * hx, 2f * hy))
+                scope.drawOval(color = EDGE, topLeft = Offset(cx - hx, cy - hy), size = Size(2f * hx, 2f * hy), style = EDGE_STROKE)
+            }
+            JumpShape.HEX -> {
+                scope.drawLine(EDGE, Offset(cx - hx, cy), Offset(cx, cy + 2f * hy), 1.5f * scale)
+                scope.drawLine(EDGE, Offset(cx + hx, cy), Offset(cx, cy + 2f * hy), 1.5f * scale)
+            }
+            JumpShape.BOX -> Unit
+        }
 
         // 中心的落点标记（加分判定半径）
         scope.drawOval(
