@@ -243,6 +243,7 @@ fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
                     fallT = if (fall > 0f) 1f else 0f,
                     tilt = tilt,
                     anchorX = anchorX,
+                    chargeDistance = if (charging) Jump.MIN_JUMP + power * (Jump.MAX_JUMP - Jump.MIN_JUMP) else 0f,
                     anchorY = anchorY,
                 )
             }

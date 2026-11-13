@@ -30,6 +30,8 @@ import kotlin.math.sin
 internal class IsoStage {
 
     /** 三个面的复用 Path。 */
+    private val guideColor = androidx.compose.ui.graphics.Color(0x99EFB8C8)
+
     private val faceTop = Path()
     private val faceLeft = Path()
     private val faceRight = Path()
@@ -51,6 +53,7 @@ internal class IsoStage {
         tilt: Float,
         anchorX: Float,
         anchorY: Float,
+        chargeDistance: Float = 0f,
     ) {
         val scale = scope.density
         // 远的先画：平台按 f 递增排列，从最后一块往前画
@@ -62,6 +65,29 @@ internal class IsoStage {
             val drop = if (current) sink else 0f
             val cy = anchorY - (df * ISO_Y + CUBE_HEIGHT - drop) * scale
             drawCube(scope, cx, cy, scale, current)
+        }
+        // 蓄力辅助线：从当前方块前沿沿 +f 铺到预计落点，长度就是这一跳能到的位置
+        if (chargeDistance > 0f) {
+            val base = platforms[currentIndex]
+            val from = base.center
+            val to = from + chargeDistance
+            val y0 = anchorY - ((from - cameraF) * ISO_Y + CUBE_HEIGHT) * scale
+            val x0 = anchorX + (from - cameraF) * ISO_X * scale
+            val x1 = anchorX + (to - cameraF) * ISO_X * scale
+            val y1 = anchorY - ((to - cameraF) * ISO_Y + CUBE_HEIGHT) * scale
+            var k = 0f
+            while (k < 1f) {
+                val a = k
+                val b = (k + 0.055f).coerceAtMost(1f)
+                drawLine(
+                    color = guideColor,
+                    start = androidx.compose.ui.geometry.Offset(x0 + (x1 - x0) * a, y0 + (y1 - y0) * a),
+                    end = androidx.compose.ui.geometry.Offset(x0 + (x1 - x0) * b, y0 + (y1 - y0) * b),
+                    strokeWidth = 2f * scale,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                )
+                k += 0.11f
+            }
         }
         drawPlayer(
             scope = scope,
