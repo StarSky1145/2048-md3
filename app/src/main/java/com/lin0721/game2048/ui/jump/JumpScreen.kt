@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -85,6 +86,9 @@ fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
     var gameSeq by remember { mutableIntStateOf(0) }
     var charging by remember { mutableStateOf(false) }
     var power by remember { mutableFloatStateOf(0f) }
+    // 用自增序号而不是布尔量触发蓄力：布尔量在「上次按压被取消、charging 卡在 true」时
+    // 再按下去值不变，LaunchedEffect 不会重启，表现就是偶发蓄不上力
+    var chargeSeq by remember { mutableIntStateOf(0) }
     var flight by remember { mutableStateOf<Flight?>(null) }
     val scope = rememberCoroutineScope()
     var deadF by remember { mutableFloatStateOf(0f) }
@@ -101,7 +105,7 @@ fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
 
     // 蓄力进度：按住后 0.9 秒到满
-    LaunchedEffect(charging) {
+    LaunchedEffect(chargeSeq) {
         if (!charging) return@LaunchedEffect
         val started = System.nanoTime()
         while (true) {
@@ -194,6 +198,7 @@ fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
                         onPress = {
                             charging = true
                             power = 0f
+                            chargeSeq++
                             tryAwaitRelease()
                             charging = false
                             release()
