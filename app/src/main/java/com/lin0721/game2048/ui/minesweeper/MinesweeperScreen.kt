@@ -162,6 +162,12 @@ fun MinesweeperScreen(prefs: Prefs, onBack: () -> Unit) {
                     selected = flagMode,
                     onClick = { flagMode = !flagMode },
                 )
+                Spacer(Modifier.padding(horizontal = 3.dp))
+                SelectChip(
+                    text = "提示",
+                    selected = false,
+                    onClick = { game = Minesweeper.hint(game, System.currentTimeMillis()) },
+                )
             }
 
             Spacer(Modifier.height(4.dp))
