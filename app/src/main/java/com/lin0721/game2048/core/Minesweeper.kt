@@ -76,6 +76,40 @@ object Minesweeper {
         )
     }
 
+    /**
+     * 提示：翻一张必安全的格子。
+     * 优先挑「周围已有数字、且这个数字的邻雷已经插满」的格子——那种格子在逻辑上可推出安全，
+     * 玩起来像真的在推理，而不是白送一格。
+     */
+    fun hint(state: MinesweeperState, now: Long, rand: Random = Random): MinesweeperState {
+        if (state.status != MinesweeperStatus.PLAYING) return state
+        val size = state.size
+        val safe = state.cells.indices.filter {
+            val c = state.cells[it]
+            !c.revealed && !c.flagged && !c.mine
+        }
+        if (safe.isEmpty()) return state
+        val deduced = safe.firstOrNull { i ->
+            val r = i / size
+            val col = i % size
+            val neighbours = buildList {
+                for (dr in -1..1) for (dc in -1..1) {
+                    if (dr == 0 && dc == 0) continue
+                    val nr = r + dr
+                    val nc = col + dc
+                    if (nr in 0 until size && nc in 0 until size) add(nr * size + nc)
+                }
+            }
+            neighbours.any { n ->
+                val cell = state.cells[n]
+                cell.revealed && cell.adjacent > 0 &&
+                    neighbours.count { state.cells[it].flagged } >= cell.adjacent
+            }
+        }
+        val pick = deduced ?: safe.random(rand)
+        return reveal(state, pick / size, pick % size, now, rand)
+    }
+
     fun toggleFlag(state: MinesweeperState, row: Int, col: Int): MinesweeperState {
         if (state.status != MinesweeperStatus.PLAYING) return state
         val index = indexOf(state, row, col) ?: return state
