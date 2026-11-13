@@ -47,6 +47,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lin0721.game2048.core.Jump
+import com.lin0721.game2048.core.PlatformKind
+import com.lin0721.game2048.core.platformKind
 import com.lin0721.game2048.core.JumpResult
 import com.lin0721.game2048.core.JumpStatus
 import com.lin0721.game2048.data.Prefs
@@ -172,7 +174,13 @@ fun JumpScreen(prefs: Prefs, onBack: () -> Unit) {
 
     fun release() {
         if (game.status != JumpStatus.PLAYING || flight != null) return
-        val distance = Jump.MIN_JUMP + power * (Jump.MAX_JUMP - Jump.MIN_JUMP)
+        var distance = Jump.MIN_JUMP + power * (Jump.MAX_JUMP - Jump.MIN_JUMP)
+        // 当前方块决定这一跳的手感：弹簧 +40%，重块 -30%
+        when (platformKind(game.current)) {
+            PlatformKind.SPRING -> distance *= 1.4f
+            PlatformKind.HEAVY -> distance *= 0.7f
+            else -> Unit
+        }
         val result = Jump.jump(game, distance)
         power = 0f
         // 先把飞行进度归零，再挂上 flight：否则这一帧用的还是上一跳的 jumpT(=1)，

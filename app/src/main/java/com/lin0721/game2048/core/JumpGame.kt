@@ -4,6 +4,18 @@ import kotlin.math.abs
 import kotlin.random.Random
 
 /** 一块落脚平台，坐标是世界坐标（dp），中心对称。 */
+enum class PlatformKind { NORMAL, BONUS, SPRING, NARROW, HEAVY }
+
+/** 方块类型按序号决定：棋盘生成与渲染共用这一份规则，避免两边漂移。 */
+fun platformKind(index: Int): PlatformKind = when {
+    index < 5 -> PlatformKind.NORMAL
+    index % 7 == 0 -> PlatformKind.BONUS
+    index % 6 == 0 -> PlatformKind.SPRING
+    index % 5 == 0 -> PlatformKind.NARROW
+    index % 11 == 0 -> PlatformKind.HEAVY
+    else -> PlatformKind.NORMAL
+}
+
 data class JumpPlatform(val center: Float, val width: Float) {
     val left: Float get() = center - width / 2f
     val right: Float get() = center + width / 2f
@@ -79,7 +91,14 @@ object Jump {
         }
 
         val centered = abs(landing - target.center) <= CENTER_TOLERANCE
-        val gained = if (centered) 2 else 1
+        val landedKind = platformKind(game.current + 1)
+        val kindBonus = when (landedKind) {
+            PlatformKind.BONUS -> 3
+            PlatformKind.SPRING -> 2
+            PlatformKind.NARROW -> 1
+            else -> 0
+        }
+        val gained = (if (centered) 2 else 1) + kindBonus
         val nextIndex = game.current + 1
 
         // 每次落地补一块新平台，保证下一跳永远有目标
