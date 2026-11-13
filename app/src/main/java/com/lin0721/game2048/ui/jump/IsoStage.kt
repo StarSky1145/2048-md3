@@ -192,8 +192,21 @@ internal class IsoStage {
                 scope.drawOval(color = EDGE, topLeft = Offset(cx - hx, cy - hy), size = Size(2f * hx, 2f * hy), style = EDGE_STROKE)
             }
             JumpShape.HEX -> {
-                scope.drawLine(EDGE, Offset(cx - hx, cy), Offset(cx, cy + 2f * hy), 1.5f * scale)
-                scope.drawLine(EDGE, Offset(cx + hx, cy), Offset(cx, cy + 2f * hy), 1.5f * scale)
+                // 用细四边形代替描边，避免依赖 drawLine 扩展的导入
+                faceRight.rewind()
+                faceRight.moveTo(cx - hx, cy)
+                faceRight.lineTo(cx, cy + 2f * hy)
+                faceRight.lineTo(cx, cy + 2f * hy - 2f * scale)
+                faceRight.lineTo(cx - hx, cy - 1.2f * scale)
+                faceRight.close()
+                scope.drawPath(faceRight, EDGE)
+                faceRight.rewind()
+                faceRight.moveTo(cx + hx, cy)
+                faceRight.lineTo(cx, cy + 2f * hy)
+                faceRight.lineTo(cx, cy + 2f * hy - 2f * scale)
+                faceRight.lineTo(cx + hx, cy - 1.2f * scale)
+                faceRight.close()
+                scope.drawPath(faceRight, EDGE)
             }
             JumpShape.BOX -> Unit
         }
